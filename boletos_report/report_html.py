@@ -1002,7 +1002,7 @@ def generate_html_report(
             return value.toLocaleString('pt-BR');
         }
         
-        function updateMetrics() {{
+        function updateMetrics() {
             let totalDevedores = originalData.devedores;
             let totalBoletos = originalData.boletos;
             let totalDivida = originalData.divida;
@@ -1074,7 +1074,7 @@ def generate_html_report(
             updateMaxMinBoleto();
         }
         
-        function updateMaxMinBoleto() {{
+        function updateMaxMinBoleto() {
             // Filtrar boletos ativos (não removidos)
             const boletosAtivos = boletosIndividuais.filter(boleto => {
                 // Verificar se a pena completa foi removida
@@ -1192,7 +1192,7 @@ def generate_html_report(
             }
         }
         
-        function updateDescriptiveStats() {{
+        function updateDescriptiveStats() {
             // Coletar todos os valores atuais de dívidas (considerando remoções)
             const valoresAtuais = [];
             
@@ -1306,7 +1306,7 @@ def generate_html_report(
             }
         }
         
-        function updateMaxMinDebt() {{
+        function updateMaxMinDebt() {
             // Calcular valores atuais considerando remoções completas e por mês
             const valoresAtuais = {};
             
@@ -1395,7 +1395,7 @@ def generate_html_report(
             }
         }
         
-        function removerPena(pena) {{
+        function removerPena(pena) {
             if (!pena) {
                 const input = document.getElementById('penaInput');
                 pena = input.value.trim();
@@ -1447,7 +1447,7 @@ def generate_html_report(
             }
         }
         
-        function removerPenaPorMes(pena, mes, event) {{
+        function removerPenaPorMes(pena, mes, event) {
             if (event) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -1502,7 +1502,7 @@ def generate_html_report(
             return false;
         }
         
-        function resetarBaixas() {{
+        function resetarBaixas() {
             const totalBaixas = removedPenas.size + removedPenasPorMes.size;
             if (totalBaixas === 0) {
                 alert('Nenhuma baixa para resetar.');
@@ -1549,7 +1549,7 @@ def generate_html_report(
             updateRemovedList();
         }
         
-        function updateRemovedList() {{
+        function updateRemovedList() {
             const container = document.getElementById('removedPenas');
             
             if (removedPenas.size === 0 && removedPenasPorMes.size === 0) {
@@ -1586,7 +1586,7 @@ def generate_html_report(
         // Criar gráfico de evolução da dívida
         let debtChart = null;
         
-        function initDebtChart() {{
+        function initDebtChart() {
             const ctx = document.getElementById('debtEvolutionChart');
             if (!ctx || temporalData.length === 0) {
                 return;
@@ -1735,7 +1735,7 @@ def generate_html_report(
         // Função de ordenação de tabela
         let currentSort = { column: 4, direction: 'desc' }; // Coluna 4 = Valor em Aberto (índice 0-based)
         
-        function getCellValue(cell, sortType) {{
+        function getCellValue(cell, sortType) {
             if (!cell) return sortType === 'number' ? 0 : '';
             
             const dataValue = cell.getAttribute('data-value');
@@ -1756,7 +1756,7 @@ def generate_html_report(
             }
         }
         
-        function sortTable(columnIndex, sortType) {{
+        function sortTable(columnIndex, sortType) {
             const table = document.getElementById('debtorsTable');
             if (!table) return;
             
@@ -1823,7 +1823,7 @@ def generate_html_report(
         }
         
         // Adicionar event listeners aos cabeçalhos ordenáveis
-        function initTableSorting() {{
+        function initTableSorting() {
             const table = document.getElementById('debtorsTable');
             if (!table) return;
             
