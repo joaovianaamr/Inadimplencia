@@ -1,6 +1,20 @@
 # Pasta de Relatórios
 
-Esta pasta contém todos os relatórios gerados pelo sistema de análise de inadimplência, organizados em pastas por categoria.
+Esta pasta contém todos os relatórios gerados pelo sistema de análise de inadimplência.
+
+## ⚠️ Importante: Relatórios Únicos por Execução
+
+**Cada execução do sistema cria uma pasta única com timestamp**, garantindo que os relatórios não sejam misturados entre diferentes execuções.
+
+### Estrutura de Pastas
+
+Cada execução cria uma pasta no formato: `relatorio_YYYYMMDD_HHMMSS`
+
+Exemplo:
+- `relatorio_20260114_135516/` - Relatório gerado em 14/01/2026 às 13:55:16
+- `relatorio_20260114_140230/` - Relatório gerado em 14/01/2026 às 14:02:30
+
+Dentro de cada pasta de relatório, os arquivos são organizados em pastas temáticas:
 
 ## Estrutura Organizada
 
