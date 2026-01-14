@@ -166,7 +166,8 @@ def plot_bar_top10_debtors_total(ranking_df: pd.DataFrame, output_dir: str):
     
     bars = ax.barh(range(len(ranking_df)), ranking_df['divida_total'], color='#d32f2f')
     ax.set_yticks(range(len(ranking_df)))
-    ax.set_yticklabels([f"{row['pena_agua']} - {nome}" for _, row, nome in zip(ranking_df.index, ranking_df.itertuples(), nomes_display)], fontsize=9)
+    labels = [f"{row['pena_agua']} - {nome}" for (_, row), nome in zip(ranking_df.iterrows(), nomes_display)]
+    ax.set_yticklabels(labels, fontsize=9)
     ax.set_xlabel('Dívida Total (R$)', fontsize=12)
     ax.set_title('Top 10 Devedores por Dívida Total', fontsize=14, fontweight='bold')
     ax.grid(True, alpha=0.3, axis='x')
@@ -200,7 +201,8 @@ def plot_bar_top10_debtors_recurrence(recurrence_df: pd.DataFrame, output_dir: s
     
     bars = ax.barh(range(len(recurrence_df)), recurrence_df['qtd_boletos_open'], color='#f57c00')
     ax.set_yticks(range(len(recurrence_df)))
-    ax.set_yticklabels([f"{row['pena_agua']} - {nome}" for _, row, nome in zip(recurrence_df.index, recurrence_df.itertuples(), nomes_display)], fontsize=9)
+    labels = [f"{row['pena_agua']} - {nome}" for (_, row), nome in zip(recurrence_df.iterrows(), nomes_display)]
+    ax.set_yticklabels(labels, fontsize=9)
     ax.set_xlabel('Quantidade de Boletos em Aberto', fontsize=12)
     ax.set_title('Top 10 Devedores por Reincidência', fontsize=14, fontweight='bold')
     ax.grid(True, alpha=0.3, axis='x')
