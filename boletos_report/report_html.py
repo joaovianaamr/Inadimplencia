@@ -222,6 +222,28 @@ def generate_html_report(
             text-decoration: line-through;
             background-color: #ffebee;
         }
+        .remove-btn {
+            background-color: #d32f2f;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .remove-btn:hover {
+            background-color: #b71c1c;
+        }
+        .remove-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
         .kpi-value.dynamic {
             transition: all 0.3s ease;
         }
@@ -621,6 +643,7 @@ def generate_html_report(
         <p><em>Lista completa ordenada por valor em aberto (maior para menor). Use para verificação se realmente estão em aberto.</em></p>
         <table id="debtorsTable">
             <tr>
+                <th style="width: 50px;">Ação</th>
                 <th>Pena de Água</th>
                 <th>Nome</th>
                 <th>Banco</th>
@@ -645,6 +668,9 @@ def generate_html_report(
         for _, row in devedores_completos.iterrows():
             html_content.append(f"""
             <tr class="debtor-row" data-pena="{row['pena_agua']}">
+                <td>
+                    <button class="remove-btn" onclick="removerPenaPorBotao('{row['pena_agua']}')" title="Dar baixa desta pena">−</button>
+                </td>
                 <td><strong>{row['pena_agua']}</strong></td>
                 <td>{row['nome']}</td>
                 <td>{row['banco']}</td>
@@ -654,7 +680,7 @@ def generate_html_report(
             </tr>
 """)
     else:
-        html_content.append("<tr><td colspan='6'>Nenhum devedor em aberto encontrado.</td></tr>")
+        html_content.append("<tr><td colspan='7'>Nenhum devedor em aberto encontrado.</td></tr>")
     
     html_content.append("</table>")
     
@@ -730,40 +756,56 @@ def generate_html_report(
             kpiTicket.textContent = formatCurrency(ticketMedio);
         }
         
-        function removerPena() {
-            const input = document.getElementById('penaInput');
-            const pena = input.value.trim();
-            
+        function removerPena(pena) {
             if (!pena) {
-                alert('Por favor, digite uma pena de água.');
-                return;
+                const input = document.getElementById('penaInput');
+                pena = input.value.trim();
+                
+                if (!pena) {
+                    alert('Por favor, digite uma pena de água.');
+                    return;
+                }
             }
             
             if (!devedoresData[pena]) {
                 alert('Pena de água não encontrada na lista de devedores em aberto.');
-                input.value = '';
+                const input = document.getElementById('penaInput');
+                if (input) input.value = '';
                 return;
             }
             
             if (removedPenas.has(pena)) {
                 alert('Esta pena de água já foi removida.');
-                input.value = '';
+                const input = document.getElementById('penaInput');
+                if (input) input.value = '';
                 return;
             }
             
             removedPenas.add(pena);
             
-            // Marcar linhas na tabela
+            // Marcar linhas na tabela e desabilitar botão
             const rows = document.querySelectorAll(`tr[data-pena="${pena}"]`);
             rows.forEach(row => {
                 row.classList.add('removed');
+                const btn = row.querySelector('.remove-btn');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.5';
+                }
             });
             
             updateMetrics();
             updateRemovedList();
             
-            input.value = '';
-            input.focus();
+            const input = document.getElementById('penaInput');
+            if (input) {
+                input.value = '';
+                input.focus();
+            }
+        }
+        
+        function removerPenaPorBotao(pena) {
+            removerPena(pena);
         }
         
         function resetarBaixas() {
@@ -780,6 +822,11 @@ def generate_html_report(
                 const rows = document.querySelectorAll(`tr[data-pena="${pena}"]`);
                 rows.forEach(row => {
                     row.classList.remove('removed');
+                    const btn = row.querySelector('.remove-btn');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                    }
                 });
             });
             
