@@ -1242,7 +1242,7 @@ def generate_html_report(
 """)
     
     # Salvar arquivo
-    output_file = output_path / "relatorio_inadimplencia.html"
+    output_file = output_path / f"relatorio_inadimplencia_{report_number}.html"
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write('\n'.join(html_content))
     

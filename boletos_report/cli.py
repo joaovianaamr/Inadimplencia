@@ -299,7 +299,7 @@ def main():
         logger.info("PROCESSAMENTO CONCLUÍDO COM SUCESSO!")
         logger.info("=" * 60)
         logger.info(f"Relatórios gerados em: {output_path}")
-        logger.info(f"  - HTML: {output_path / 'relatorio_inadimplencia.html'}")
+        logger.info(f"  - HTML: {output_path / f'relatorio_inadimplencia_{report_number}.html'}")
         if 'csv' in formats or 'xlsx' in formats:
             logger.info(f"  - CSVs/XLSX: {output_path}")
         logger.info(f"  - Gráficos: {output_path / 'charts'}")
