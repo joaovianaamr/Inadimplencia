@@ -295,8 +295,10 @@ def generate_html_report(
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-</head>
-<body>
+        <!-- Dados de remoções salvas (para portabilidade) -->
+        <script type="application/json" id="saved-removals-data"></script>
+    </head>
+    <body>
     <div class="container">
         <h1>📊 Relatório de Inadimplência</h1>
         <p><strong>Número do Relatório:</strong> relatorio_""" + str(report_number) + """</p>
@@ -860,18 +862,147 @@ def generate_html_report(
     html_content.append("""
         ];
         
+        // Número do relatório para chave única no localStorage
+        const report_number = """ + str(report_number) + """;
+        
         const removedPenas = new Set(); // Pena completa (todos os meses)
         const removedPenasPorMes = new Set(); // Pena + mês específico
         
-        function formatCurrency(value) {
-            return 'R$ ' + value.toFixed(2).replace('.', ',').replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.');
-        }
+        // Chave única para este relatório
+        const storageKey = 'relatorio_baixas_' + report_number;
         
-        function formatNumber(value) {
+        // Função para salvar remoções no localStorage
+        function saveRemovals() {{
+            const data = {{
+                removedPenas: Array.from(removedPenas),
+                removedPenasPorMes: Array.from(removedPenasPorMes),
+                timestamp: new Date().toISOString()
+            }};
+            try {{
+                localStorage.setItem(storageKey, JSON.stringify(data));
+            }} catch (e) {{
+                console.warn('Não foi possível salvar no localStorage:', e);
+            }}
+        }}
+        
+        // Função para salvar remoções no HTML (para portabilidade)
+        function saveRemovalsToHTML() {{
+            const data = {{
+                removedPenas: Array.from(removedPenas),
+                removedPenasPorMes: Array.from(removedPenasPorMes),
+                timestamp: new Date().toISOString()
+            }};
+            
+            // Criar ou atualizar elemento script com os dados
+            let scriptEl = document.getElementById('saved-removals-data');
+            if (!scriptEl) {{
+                scriptEl = document.createElement('script');
+                scriptEl.id = 'saved-removals-data';
+                scriptEl.type = 'application/json';
+                document.head.appendChild(scriptEl);
+            }}
+            scriptEl.textContent = JSON.stringify(data);
+        }}
+        
+        // Função para carregar remoções do localStorage ou HTML
+        function loadRemovals() {{
+            let data = null;
+            
+            // Tentar carregar do script inline no HTML primeiro (portabilidade)
+            const scriptEl = document.getElementById('saved-removals-data');
+            if (scriptEl && scriptEl.textContent) {{
+                try {{
+                    data = JSON.parse(scriptEl.textContent);
+                    console.log('Baixas carregadas do HTML');
+                }} catch (e) {{
+                    console.warn('Erro ao ler dados do HTML:', e);
+                }}
+            }}
+            
+            // Se não encontrou no HTML, tentar localStorage
+            if (!data) {{
+                try {{
+                    const saved = localStorage.getItem(storageKey);
+                    if (saved) {{
+                        data = JSON.parse(saved);
+                        console.log('Baixas carregadas do localStorage');
+                    }}
+                }} catch (e) {{
+                    console.warn('Erro ao ler do localStorage:', e);
+                }}
+            }}
+            
+            if (!data) {{
+                return; // Nenhum dado salvo
+            }}
+            
+            // Restaurar penas removidas completamente
+            if (data.removedPenas && Array.isArray(data.removedPenas)) {{
+                data.removedPenas.forEach(pena => {{
+                    if (devedoresData[pena]) {{
+                        removedPenas.add(pena);
+                        // Marcar linhas na tabela
+                        const rows = document.querySelectorAll('tr[data-pena="' + pena + '"]');
+                        rows.forEach(row => {{
+                            row.classList.add('removed');
+                            const btn = row.querySelector('.remove-btn');
+                            if (btn) {{
+                                btn.disabled = true;
+                                btn.style.opacity = '0.5';
+                            }}
+                        }});
+                    }}
+                }});
+            }}
+            
+            // Restaurar penas removidas por mês
+            if (data.removedPenasPorMes && Array.isArray(data.removedPenasPorMes)) {{
+                data.removedPenasPorMes.forEach(uniqueId => {{
+                    if (devedoresPorMesData[uniqueId]) {{
+                        removedPenasPorMes.add(uniqueId);
+                        // Marcar linha na tabela
+                        const row = document.querySelector('tr[data-unique-id="' + uniqueId + '"]');
+                        if (row) {{
+                            row.classList.add('removed');
+                            const btn = row.querySelector('.remove-btn');
+                            if (btn) {{
+                                btn.disabled = true;
+                                btn.style.opacity = '0.5';
+                            }}
+                        }}
+                    }}
+                }});
+            }}
+            
+            // Atualizar métricas após restaurar
+            updateMetrics();
+            updateRemovedList();
+        }}
+        
+        // Função para limpar remoções do localStorage
+        function clearRemovals() {{
+            try {{
+                localStorage.removeItem(storageKey);
+            }} catch (e) {{
+                console.warn('Não foi possível limpar localStorage:', e);
+            }}
+            
+            // Remover também do HTML
+            const scriptEl = document.getElementById('saved-removals-data');
+            if (scriptEl) {{
+                scriptEl.remove();
+            }}
+        }}
+        
+        function formatCurrency(value) {{
+            return 'R$ ' + value.toFixed(2).replace('.', ',').replace(/\\B(?=(\\d{{3}})+(?!\\d))/g, '.');
+        }}
+        
+        function formatNumber(value) {{
             return value.toLocaleString('pt-BR');
-        }
+        }}
         
-        function updateMetrics() {
+        function updateMetrics() {{
             let totalDevedores = originalData.devedores;
             let totalBoletos = originalData.boletos;
             let totalDivida = originalData.divida;
@@ -943,7 +1074,7 @@ def generate_html_report(
             updateMaxMinBoleto();
         }
         
-        function updateMaxMinBoleto() {
+        function updateMaxMinBoleto() {{
             // Filtrar boletos ativos (não removidos)
             const boletosAtivos = boletosIndividuais.filter(boleto => {
                 // Verificar se a pena completa foi removida
@@ -1061,7 +1192,7 @@ def generate_html_report(
             }
         }
         
-        function updateDescriptiveStats() {
+        function updateDescriptiveStats() {{
             // Coletar todos os valores atuais de dívidas (considerando remoções)
             const valoresAtuais = [];
             
@@ -1175,7 +1306,7 @@ def generate_html_report(
             }
         }
         
-        function updateMaxMinDebt() {
+        function updateMaxMinDebt() {{
             // Calcular valores atuais considerando remoções completas e por mês
             const valoresAtuais = {};
             
@@ -1264,7 +1395,7 @@ def generate_html_report(
             }
         }
         
-        function removerPena(pena) {
+        function removerPena(pena) {{
             if (!pena) {
                 const input = document.getElementById('penaInput');
                 pena = input.value.trim();
@@ -1302,6 +1433,10 @@ def generate_html_report(
                 }
             });
             
+            // Salvar no localStorage e HTML
+            saveRemovals();
+            saveRemovalsToHTML();
+            
             updateMetrics();
             updateRemovedList();
             
@@ -1312,7 +1447,7 @@ def generate_html_report(
             }
         }
         
-        function removerPenaPorMes(pena, mes, event) {
+        function removerPenaPorMes(pena, mes, event) {{
             if (event) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -1352,6 +1487,10 @@ def generate_html_report(
                 }
             }
             
+            // Salvar no localStorage e HTML
+            saveRemovals();
+            saveRemovalsToHTML();
+            
             updateMetrics();
             updateRemovedList();
             
@@ -1363,7 +1502,7 @@ def generate_html_report(
             return false;
         }
         
-        function resetarBaixas() {
+        function resetarBaixas() {{
             const totalBaixas = removedPenas.size + removedPenasPorMes.size;
             if (totalBaixas === 0) {
                 alert('Nenhuma baixa para resetar.');
@@ -1402,11 +1541,15 @@ def generate_html_report(
             
             removedPenas.clear();
             removedPenasPorMes.clear();
+            
+            // Limpar do localStorage e HTML
+            clearRemovals();
+            
             updateMetrics(); // Isso já chama updateMaxMinDebt()
             updateRemovedList();
         }
         
-        function updateRemovedList() {
+        function updateRemovedList() {{
             const container = document.getElementById('removedPenas');
             
             if (removedPenas.size === 0 && removedPenasPorMes.size === 0) {
@@ -1443,7 +1586,7 @@ def generate_html_report(
         // Criar gráfico de evolução da dívida
         let debtChart = null;
         
-        function initDebtChart() {
+        function initDebtChart() {{
             const ctx = document.getElementById('debtEvolutionChart');
             if (!ctx || temporalData.length === 0) {
                 return;
@@ -1580,10 +1723,19 @@ def generate_html_report(
             initDebtChart();
         }
         
+        // Carregar remoções salvas quando a página carregar
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(loadRemovals, 200);
+            });
+        } else {
+            setTimeout(loadRemovals, 200);
+        }
+        
         // Função de ordenação de tabela
         let currentSort = { column: 4, direction: 'desc' }; // Coluna 4 = Valor em Aberto (índice 0-based)
         
-        function getCellValue(cell, sortType) {
+        function getCellValue(cell, sortType) {{
             if (!cell) return sortType === 'number' ? 0 : '';
             
             const dataValue = cell.getAttribute('data-value');
@@ -1604,7 +1756,7 @@ def generate_html_report(
             }
         }
         
-        function sortTable(columnIndex, sortType) {
+        function sortTable(columnIndex, sortType) {{
             const table = document.getElementById('debtorsTable');
             if (!table) return;
             
@@ -1671,7 +1823,7 @@ def generate_html_report(
         }
         
         // Adicionar event listeners aos cabeçalhos ordenáveis
-        function initTableSorting() {
+        function initTableSorting() {{
             const table = document.getElementById('debtorsTable');
             if (!table) return;
             
