@@ -365,12 +365,12 @@ def generate_html_report(
 """)
     
     html_content.append(f"""
-            <tr><td>Média</td><td>{format_currency(metrics['valor_medio'])}</td></tr>
-            <tr><td>Mediana</td><td>{format_currency(metrics['valor_mediana'])}</td></tr>
-            <tr><td>Moda</td><td>{format_currency(metrics['valor_moda'])}</td></tr>
-            <tr><td>Desvio Padrão</td><td>{format_currency(metrics['valor_desvio_padrao'])}</td></tr>
-            <tr><td>Percentil 90</td><td>{format_currency(metrics['valor_p90'])}</td></tr>
-            <tr><td>Percentil 95</td><td>{format_currency(metrics['valor_p95'])}</td></tr>
+            <tr><td>Média</td><td class="dynamic" id="stat-media">{format_currency(metrics['valor_medio'])}</td></tr>
+            <tr><td>Mediana</td><td class="dynamic" id="stat-mediana">{format_currency(metrics['valor_mediana'])}</td></tr>
+            <tr><td>Moda</td><td class="dynamic" id="stat-moda">{format_currency(metrics['valor_moda'])}</td></tr>
+            <tr><td>Desvio Padrão</td><td class="dynamic" id="stat-desvio">{format_currency(metrics['valor_desvio_padrao'])}</td></tr>
+            <tr><td>Percentil 90</td><td class="dynamic" id="stat-p90">{format_currency(metrics['valor_p90'])}</td></tr>
+            <tr><td>Percentil 95</td><td class="dynamic" id="stat-p95">{format_currency(metrics['valor_p95'])}</td></tr>
         </table>
 """)
     
@@ -911,6 +911,123 @@ def generate_html_report(
             
             // Atualizar maior e menor dívida
             updateMaxMinDebt();
+            
+            // Atualizar estatísticas descritivas
+            updateDescriptiveStats();
+        }
+        
+        function updateDescriptiveStats() {
+            // Coletar todos os valores atuais de dívidas (considerando remoções)
+            const valoresAtuais = [];
+            
+            // Adicionar valores de penas não removidas completamente
+            Object.entries(devedoresData).forEach(([pena, data]) => {
+                if (!removedPenas.has(pena)) {
+                    // Adicionar valores de todos os meses desta pena que não foram removidos
+                    Object.entries(devedoresPorMesData).forEach(([uniqueId, mesData]) => {
+                        if (mesData.pena === pena && !removedPenasPorMes.has(uniqueId)) {
+                            valoresAtuais.push(mesData.valor);
+                        }
+                    });
+                }
+            });
+            
+            if (valoresAtuais.length === 0) {
+                // Se não há valores, definir tudo como zero
+                const statMedia = document.getElementById('stat-media');
+                const statMediana = document.getElementById('stat-mediana');
+                const statModa = document.getElementById('stat-moda');
+                const statDesvio = document.getElementById('stat-desvio');
+                const statP90 = document.getElementById('stat-p90');
+                const statP95 = document.getElementById('stat-p95');
+                
+                if (statMedia) statMedia.textContent = formatCurrency(0);
+                if (statMediana) statMediana.textContent = formatCurrency(0);
+                if (statModa) statModa.textContent = formatCurrency(0);
+                if (statDesvio) statDesvio.textContent = formatCurrency(0);
+                if (statP90) statP90.textContent = formatCurrency(0);
+                if (statP95) statP95.textContent = formatCurrency(0);
+                return;
+            }
+            
+            // Ordenar valores para cálculos
+            valoresAtuais.sort((a, b) => a - b);
+            
+            // Calcular estatísticas
+            const n = valoresAtuais.length;
+            const soma = valoresAtuais.reduce((acc, val) => acc + val, 0);
+            const media = soma / n;
+            
+            // Mediana
+            let mediana;
+            if (n % 2 === 0) {
+                mediana = (valoresAtuais[n / 2 - 1] + valoresAtuais[n / 2]) / 2;
+            } else {
+                mediana = valoresAtuais[Math.floor(n / 2)];
+            }
+            
+            // Moda (valor que mais aparece)
+            const frequencias = {};
+            valoresAtuais.forEach(val => {
+                frequencias[val] = (frequencias[val] || 0) + 1;
+            });
+            let moda = valoresAtuais[0];
+            let maxFreq = 1;
+            Object.entries(frequencias).forEach(([val, freq]) => {
+                if (freq > maxFreq) {
+                    maxFreq = freq;
+                    moda = parseFloat(val);
+                }
+            });
+            
+            // Desvio padrão
+            const variancia = valoresAtuais.reduce((acc, val) => acc + Math.pow(val - media, 2), 0) / n;
+            const desvioPadrao = Math.sqrt(variancia);
+            
+            // Percentis
+            const p90Index = Math.ceil(n * 0.90) - 1;
+            const p95Index = Math.ceil(n * 0.95) - 1;
+            const p90 = valoresAtuais[Math.min(p90Index, n - 1)];
+            const p95 = valoresAtuais[Math.min(p95Index, n - 1)];
+            
+            // Atualizar elementos HTML
+            const statMedia = document.getElementById('stat-media');
+            const statMediana = document.getElementById('stat-mediana');
+            const statModa = document.getElementById('stat-moda');
+            const statDesvio = document.getElementById('stat-desvio');
+            const statP90 = document.getElementById('stat-p90');
+            const statP95 = document.getElementById('stat-p95');
+            
+            if (statMedia) {
+                statMedia.classList.add('updated');
+                statMedia.textContent = formatCurrency(media);
+                setTimeout(() => statMedia.classList.remove('updated'), 500);
+            }
+            if (statMediana) {
+                statMediana.classList.add('updated');
+                statMediana.textContent = formatCurrency(mediana);
+                setTimeout(() => statMediana.classList.remove('updated'), 500);
+            }
+            if (statModa) {
+                statModa.classList.add('updated');
+                statModa.textContent = formatCurrency(moda);
+                setTimeout(() => statModa.classList.remove('updated'), 500);
+            }
+            if (statDesvio) {
+                statDesvio.classList.add('updated');
+                statDesvio.textContent = formatCurrency(desvioPadrao);
+                setTimeout(() => statDesvio.classList.remove('updated'), 500);
+            }
+            if (statP90) {
+                statP90.classList.add('updated');
+                statP90.textContent = formatCurrency(p90);
+                setTimeout(() => statP90.classList.remove('updated'), 500);
+            }
+            if (statP95) {
+                statP95.classList.add('updated');
+                statP95.textContent = formatCurrency(p95);
+                setTimeout(() => statP95.classList.remove('updated'), 500);
+            }
         }
         
         function updateMaxMinDebt() {
