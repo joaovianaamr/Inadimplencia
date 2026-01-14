@@ -793,11 +793,36 @@ def generate_html_report(
             let totalBoletos = originalData.boletos;
             let totalDivida = originalData.divida;
             
+            // Remover penas completas (todos os meses)
             removedPenas.forEach(pena => {
                 if (devedoresData[pena]) {
                     totalDevedores--;
                     totalBoletos -= devedoresData[pena].qtd_boletos;
                     totalDivida -= devedoresData[pena].valor;
+                }
+            });
+            
+            // Remover penas por mês específico (mas não se a pena completa já foi removida)
+            removedPenasPorMes.forEach(uniqueId => {
+                if (devedoresPorMesData[uniqueId]) {
+                    const data = devedoresPorMesData[uniqueId];
+                    // Só remove se a pena completa não foi removida
+                    if (!removedPenas.has(data.pena)) {
+                        totalBoletos -= data.qtd_boletos;
+                        totalDivida -= data.valor;
+                        // Verificar se ainda há outros meses para esta pena
+                        let temOutrosMeses = false;
+                        for (const [id, d] of Object.entries(devedoresPorMesData)) {
+                            if (d.pena === data.pena && id !== uniqueId && !removedPenasPorMes.has(id) && !removedPenas.has(data.pena)) {
+                                temOutrosMeses = true;
+                                break;
+                            }
+                        }
+                        // Se não há outros meses ativos para esta pena, reduzir contador de devedores
+                        if (!temOutrosMeses) {
+                            totalDevedores--;
+                        }
+                    }
                 }
             });
             
