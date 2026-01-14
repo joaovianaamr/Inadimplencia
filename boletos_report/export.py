@@ -85,14 +85,28 @@ def export_all_summaries(
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     
+    # Criar pastas organizadas
+    folders = {
+        'resumo_geral': output_path / 'resumo_geral',
+        'por_banco': output_path / 'por_banco',
+        'por_mes': output_path / 'por_mes',
+        'rankings': output_path / 'rankings',
+        'reincidencia': output_path / 'reincidencia',
+        'mudancas': output_path / 'mudancas',
+        'qualidade': output_path / 'qualidade'
+    }
+    
+    for folder in folders.values():
+        folder.mkdir(parents=True, exist_ok=True)
+    
     # Resumo geral (apenas OPEN)
     df_open = df[df['status_categoria'] == 'OPEN'].copy()
     
     if 'csv' in formats:
-        export_to_csv(df_open, str(output_path / 'open_summary_overall.csv'))
+        export_to_csv(df_open, str(folders['resumo_geral'] / 'open_summary_overall.csv'))
     
     if 'xlsx' in formats:
-        export_to_xlsx(df_open, str(output_path / 'open_summary_overall.xlsx'), 'Geral')
+        export_to_xlsx(df_open, str(folders['resumo_geral'] / 'open_summary_overall.xlsx'), 'Geral')
     
     # Resumo por banco
     if len(df_open) > 0:
@@ -104,16 +118,16 @@ def export_all_summaries(
         by_bank = by_bank.sort_values('soma_divida', ascending=False)
         
         if 'csv' in formats:
-            export_to_csv(by_bank, str(output_path / 'open_summary_by_bank.csv'))
+            export_to_csv(by_bank, str(folders['por_banco'] / 'open_summary_by_bank.csv'))
         if 'xlsx' in formats:
-            export_to_xlsx(by_bank, str(output_path / 'open_summary_by_bank.xlsx'), 'Por Banco')
+            export_to_xlsx(by_bank, str(folders['por_banco'] / 'open_summary_by_bank.xlsx'), 'Por Banco')
     
     # Resumo por mês
     if len(temporal_df) > 0:
         if 'csv' in formats:
-            export_to_csv(temporal_df, str(output_path / 'open_summary_by_month.csv'))
+            export_to_csv(temporal_df, str(folders['por_mes'] / 'open_summary_by_month.csv'))
         if 'xlsx' in formats:
-            export_to_xlsx(temporal_df, str(output_path / 'open_summary_by_month.xlsx'), 'Por Mês')
+            export_to_xlsx(temporal_df, str(folders['por_mes'] / 'open_summary_by_month.xlsx'), 'Por Mês')
     
     # Resumo por banco e mês
     if len(df_open) > 0:
@@ -125,29 +139,29 @@ def export_all_summaries(
         by_bank_month = by_bank_month.sort_values(['banco', 'mes_referencia'])
         
         if 'csv' in formats:
-            export_to_csv(by_bank_month, str(output_path / 'open_summary_by_bank_month.csv'))
+            export_to_csv(by_bank_month, str(folders['por_banco'] / 'open_summary_by_bank_month.csv'))
         if 'xlsx' in formats:
-            export_to_xlsx(by_bank_month, str(output_path / 'open_summary_by_bank_month.xlsx'), 'Por Banco e Mês')
+            export_to_xlsx(by_bank_month, str(folders['por_banco'] / 'open_summary_by_bank_month.xlsx'), 'Por Banco e Mês')
     
     # Rankings
     if len(ranking_total) > 0:
         if 'csv' in formats:
-            export_to_csv(ranking_total, str(output_path / 'debtors_ranking_by_total_debt.csv'))
+            export_to_csv(ranking_total, str(folders['rankings'] / 'debtors_ranking_by_total_debt.csv'))
         if 'xlsx' in formats:
-            export_to_xlsx(ranking_total, str(output_path / 'debtors_ranking_by_total_debt.xlsx'), 'Ranking Dívida')
+            export_to_xlsx(ranking_total, str(folders['rankings'] / 'debtors_ranking_by_total_debt.xlsx'), 'Ranking Dívida')
     
     if len(ranking_recurrence) > 0:
         if 'csv' in formats:
-            export_to_csv(ranking_recurrence, str(output_path / 'debtors_ranking_by_recurrence.csv'))
+            export_to_csv(ranking_recurrence, str(folders['rankings'] / 'debtors_ranking_by_recurrence.csv'))
         if 'xlsx' in formats:
-            export_to_xlsx(ranking_recurrence, str(output_path / 'debtors_ranking_by_recurrence.xlsx'), 'Ranking Reincidência')
+            export_to_xlsx(ranking_recurrence, str(folders['rankings'] / 'debtors_ranking_by_recurrence.xlsx'), 'Ranking Reincidência')
     
     # Detalhes de reincidência
     if len(recurrence_detail) > 0:
         if 'csv' in formats:
-            export_to_csv(recurrence_detail, str(output_path / 'debtors_recurrence_detail.csv'))
+            export_to_csv(recurrence_detail, str(folders['reincidencia'] / 'debtors_recurrence_detail.csv'))
         if 'xlsx' in formats:
-            export_to_xlsx(recurrence_detail, str(output_path / 'debtors_recurrence_detail.xlsx'), 'Reincidência')
+            export_to_xlsx(recurrence_detail, str(folders['reincidencia'] / 'debtors_recurrence_detail.xlsx'), 'Reincidência')
     
     # Mudanças mês a mês
     if len(debt_change) > 0:
@@ -159,13 +173,13 @@ def export_all_summaries(
                                                             'divida_mes_anterior', 'divida_mes_atual', 'delta', 'pct_delta']]
         
         if 'csv' in formats:
-            export_to_csv(debt_change, str(output_path / 'debt_change_month_over_month.csv'))
-            export_to_csv(top_pioras, str(output_path / 'top10_pioras.csv'))
-            export_to_csv(top_melhoras, str(output_path / 'top10_melhoras.csv'))
+            export_to_csv(debt_change, str(folders['mudancas'] / 'debt_change_month_over_month.csv'))
+            export_to_csv(top_pioras, str(folders['mudancas'] / 'top10_pioras.csv'))
+            export_to_csv(top_melhoras, str(folders['mudancas'] / 'top10_melhoras.csv'))
         if 'xlsx' in formats:
-            export_to_xlsx(debt_change, str(output_path / 'debt_change_month_over_month.xlsx'), 'Mudanças')
-            export_to_xlsx(top_pioras, str(output_path / 'top10_pioras.xlsx'), 'Top 10 Pioras')
-            export_to_xlsx(top_melhoras, str(output_path / 'top10_melhoras.xlsx'), 'Top 10 Melhoras')
+            export_to_xlsx(debt_change, str(folders['mudancas'] / 'debt_change_month_over_month.xlsx'), 'Mudanças')
+            export_to_xlsx(top_pioras, str(folders['mudancas'] / 'top10_pioras.xlsx'), 'Top 10 Pioras')
+            export_to_xlsx(top_melhoras, str(folders['mudancas'] / 'top10_melhoras.xlsx'), 'Top 10 Melhoras')
     
     # Relatório de qualidade
     quality_df = pd.DataFrame([{
@@ -174,8 +188,8 @@ def export_all_summaries(
     } for k, v in data_quality.items() if not isinstance(v, list)])
     
     if 'csv' in formats:
-        export_to_csv(quality_df, str(output_path / 'data_quality_report.csv'))
+        export_to_csv(quality_df, str(folders['qualidade'] / 'data_quality_report.csv'))
     if 'xlsx' in formats:
-        export_to_xlsx(quality_df, str(output_path / 'data_quality_report.xlsx'), 'Qualidade')
+        export_to_xlsx(quality_df, str(folders['qualidade'] / 'data_quality_report.xlsx'), 'Qualidade')
     
     logger.info("Todos os resumos exportados")
