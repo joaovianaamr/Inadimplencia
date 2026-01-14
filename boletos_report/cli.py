@@ -271,6 +271,7 @@ def main():
                 debt_change,
                 data_quality,
                 status_classifier,
+                df_clean,
                 str(output_path)
             )
         

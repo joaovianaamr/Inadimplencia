@@ -36,6 +36,7 @@ def generate_html_report(
     debt_change: pd.DataFrame,
     data_quality: Dict[str, Any],
     status_classifier,
+    df_clean: pd.DataFrame,
     output_dir: str
 ):
     """
@@ -116,6 +117,9 @@ def generate_html_report(
         .kpi-card.success {
             background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
         }
+        .kpi-card.danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+        }
         .kpi-label {
             font-size: 14px;
             opacity: 0.9;
@@ -172,6 +176,62 @@ def generate_html_report(
             color: #777;
             font-size: 12px;
         }
+        .interactive-panel {
+            background-color: #f8f9fa;
+            border: 2px solid #1976d2;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 30px 0;
+        }
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+        .search-box input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #1976d2;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .search-box button {
+            padding: 12px 24px;
+            background-color: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .search-box button:hover {
+            background-color: #1565c0;
+        }
+        .removed-badge {
+            background-color: #ff9800;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .debtor-row.removed {
+            opacity: 0.5;
+            text-decoration: line-through;
+            background-color: #ffebee;
+        }
+        .kpi-value.dynamic {
+            transition: all 0.3s ease;
+        }
+        .kpi-value.dynamic.updated {
+            animation: pulse 0.5s;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
     </style>
 </head>
 <body>
@@ -179,6 +239,20 @@ def generate_html_report(
         <h1>📊 Relatório de Inadimplência</h1>
         <p><strong>Data de geração:</strong> """ + datetime.now().strftime("%d/%m/%Y %H:%M:%S") + """</p>
 """)
+    
+    # Painel Interativo de Baixa Manual
+    html_content.append("""
+        <div class="interactive-panel">
+            <h2 style="margin-top: 0; color: #1976d2;">🔧 Baixa Manual de Inadimplência</h2>
+            <p>Digite a pena de água para dar baixa manual (ex: pessoa já pagou mas ainda consta como em aberto).</p>
+            <div class="search-box">
+                <input type="text" id="penaInput" placeholder="Digite a pena de água (ex: 436)" />
+                <button onclick="removerPena()">Dar Baixa</button>
+                <button onclick="resetarBaixas()" style="background-color: #757575;">Resetar Todas</button>
+            </div>
+            <div id="removedPenas" style="margin-top: 10px;"></div>
+        </div>
+    """)
     
     # 1. KPIs Gerais (apenas OPEN)
     html_content.append("""
@@ -189,19 +263,19 @@ def generate_html_report(
     html_content.append(f"""
             <div class="kpi-card warning">
                 <div class="kpi-label">Total de Devedores Únicos</div>
-                <div class="kpi-value">{format_number(metrics['total_devedores_unicos'])}</div>
+                <div class="kpi-value dynamic" id="kpi-devedores">{format_number(metrics['total_devedores_unicos'])}</div>
             </div>
             <div class="kpi-card warning">
                 <div class="kpi-label">Total de Boletos em Aberto</div>
-                <div class="kpi-value">{format_number(metrics['total_boletos_em_aberto'])}</div>
+                <div class="kpi-value dynamic" id="kpi-boletos">{format_number(metrics['total_boletos_em_aberto'])}</div>
             </div>
             <div class="kpi-card danger">
                 <div class="kpi-label">Soma da Dívida em Aberto</div>
-                <div class="kpi-value">{format_currency(metrics['soma_divida_em_aberto'])}</div>
+                <div class="kpi-value dynamic" id="kpi-divida">{format_currency(metrics['soma_divida_em_aberto'])}</div>
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">Ticket Médio em Aberto</div>
-                <div class="kpi-value">{format_currency(metrics['ticket_medio_em_aberto'])}</div>
+                <div class="kpi-value dynamic" id="kpi-ticket">{format_currency(metrics['ticket_medio_em_aberto'])}</div>
             </div>
         </div>
 """)
@@ -540,6 +614,207 @@ def generate_html_report(
             html_content.append(f"<li><code>{status}</code></li>")
         html_content.append("</ul>")
         html_content.append("<p><strong>Recomendação:</strong> Revise as regras de classificação usando --paid-status e --open-status.</p>")
+    
+    # 7. Lista Completa de Devedores em Aberto
+    html_content.append("""
+        <h2>7. Lista Completa de Devedores em Aberto</h2>
+        <p><em>Lista completa ordenada por valor em aberto (maior para menor). Use para verificação se realmente estão em aberto.</em></p>
+        <table id="debtorsTable">
+            <tr>
+                <th>Pena de Água</th>
+                <th>Nome</th>
+                <th>Banco</th>
+                <th>Valor em Aberto</th>
+                <th>Qtd Boletos</th>
+                <th>Meses</th>
+            </tr>
+""")
+    
+    # Obter todos os devedores em aberto ordenados por valor total
+    df_open = df_clean[df_clean['status_categoria'] == 'OPEN'].copy()
+    devedores_completos = pd.DataFrame()
+    
+    if len(df_open) > 0:
+        devedores_completos = df_open.groupby(['pena_agua', 'nome_pagador', 'banco']).agg({
+            'valor_float': ['sum', 'count'],
+            'mes_referencia': lambda x: ', '.join(sorted(x.unique()))
+        }).reset_index()
+        devedores_completos.columns = ['pena_agua', 'nome', 'banco', 'valor_total', 'qtd_boletos', 'meses']
+        devedores_completos = devedores_completos.sort_values('valor_total', ascending=False)
+        
+        for _, row in devedores_completos.iterrows():
+            html_content.append(f"""
+            <tr class="debtor-row" data-pena="{row['pena_agua']}">
+                <td><strong>{row['pena_agua']}</strong></td>
+                <td>{row['nome']}</td>
+                <td>{row['banco']}</td>
+                <td>{format_currency(row['valor_total'])}</td>
+                <td>{int(row['qtd_boletos'])}</td>
+                <td>{row['meses']}</td>
+            </tr>
+""")
+    else:
+        html_content.append("<tr><td colspan='6'>Nenhum devedor em aberto encontrado.</td></tr>")
+    
+    html_content.append("</table>")
+    
+    # JavaScript para interatividade
+    html_content.append("""
+    <script>
+        // Dados originais
+        const originalData = {
+            devedores: """ + str(metrics['total_devedores_unicos']) + """,
+            boletos: """ + str(metrics['total_boletos_em_aberto']) + """,
+            divida: """ + str(metrics['soma_divida_em_aberto']) + """,
+            ticket: """ + str(metrics['ticket_medio_em_aberto']) + """
+        };
+        
+        // Dados dos devedores
+        const devedoresData = {
+""")
+    
+    # Adicionar dados dos devedores em formato JSON
+    if len(devedores_completos) > 0:
+        devedores_json = []
+        for _, row in devedores_completos.iterrows():
+            devedores_json.append(f"""            "{row['pena_agua']}": {{
+                "nome": {repr(row['nome'])},
+                "banco": {repr(row['banco'])},
+                "valor": {row['valor_total']},
+                "qtd_boletos": {int(row['qtd_boletos'])}
+            }}""")
+        html_content.append(',\n'.join(devedores_json))
+    
+    html_content.append("""
+        };
+        
+        const removedPenas = new Set();
+        
+        function formatCurrency(value) {
+            return 'R$ ' + value.toFixed(2).replace('.', ',').replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.');
+        }
+        
+        function formatNumber(value) {
+            return value.toLocaleString('pt-BR');
+        }
+        
+        function updateMetrics() {
+            let totalDevedores = originalData.devedores;
+            let totalBoletos = originalData.boletos;
+            let totalDivida = originalData.divida;
+            
+            removedPenas.forEach(pena => {
+                if (devedoresData[pena]) {
+                    totalDevedores--;
+                    totalBoletos -= devedoresData[pena].qtd_boletos;
+                    totalDivida -= devedoresData[pena].valor;
+                }
+            });
+            
+            const ticketMedio = totalDevedores > 0 ? totalDivida / totalDevedores : 0;
+            
+            // Atualizar KPIs com animação
+            const kpiDevedores = document.getElementById('kpi-devedores');
+            const kpiBoletos = document.getElementById('kpi-boletos');
+            const kpiDivida = document.getElementById('kpi-divida');
+            const kpiTicket = document.getElementById('kpi-ticket');
+            
+            [kpiDevedores, kpiBoletos, kpiDivida, kpiTicket].forEach(el => {
+                el.classList.add('updated');
+                setTimeout(() => el.classList.remove('updated'), 500);
+            });
+            
+            kpiDevedores.textContent = formatNumber(totalDevedores);
+            kpiBoletos.textContent = formatNumber(totalBoletos);
+            kpiDivida.textContent = formatCurrency(totalDivida);
+            kpiTicket.textContent = formatCurrency(ticketMedio);
+        }
+        
+        function removerPena() {
+            const input = document.getElementById('penaInput');
+            const pena = input.value.trim();
+            
+            if (!pena) {
+                alert('Por favor, digite uma pena de água.');
+                return;
+            }
+            
+            if (!devedoresData[pena]) {
+                alert('Pena de água não encontrada na lista de devedores em aberto.');
+                input.value = '';
+                return;
+            }
+            
+            if (removedPenas.has(pena)) {
+                alert('Esta pena de água já foi removida.');
+                input.value = '';
+                return;
+            }
+            
+            removedPenas.add(pena);
+            
+            // Marcar linhas na tabela
+            const rows = document.querySelectorAll(`tr[data-pena="${pena}"]`);
+            rows.forEach(row => {
+                row.classList.add('removed');
+            });
+            
+            updateMetrics();
+            updateRemovedList();
+            
+            input.value = '';
+            input.focus();
+        }
+        
+        function resetarBaixas() {
+            if (removedPenas.size === 0) {
+                alert('Nenhuma baixa para resetar.');
+                return;
+            }
+            
+            if (!confirm(`Deseja resetar todas as ${removedPenas.size} baixa(s) manual(is)?`)) {
+                return;
+            }
+            
+            removedPenas.forEach(pena => {
+                const rows = document.querySelectorAll(`tr[data-pena="${pena}"]`);
+                rows.forEach(row => {
+                    row.classList.remove('removed');
+                });
+            });
+            
+            removedPenas.clear();
+            updateMetrics();
+            updateRemovedList();
+        }
+        
+        function updateRemovedList() {
+            const container = document.getElementById('removedPenas');
+            
+            if (removedPenas.size === 0) {
+                container.innerHTML = '';
+                return;
+            }
+            
+            let html = '<p><strong>Penas removidas:</strong> ';
+            const penasArray = Array.from(removedPenas);
+            penasArray.forEach((pena, index) => {
+                const data = devedoresData[pena];
+                html += `<span class="removed-badge">${pena} (${data.nome.substring(0, 30)}${data.nome.length > 30 ? '...' : ''})</span>`;
+                if (index < penasArray.length - 1) html += ' ';
+            });
+            html += '</p>';
+            container.innerHTML = html;
+        }
+        
+        // Permitir Enter no input
+        document.getElementById('penaInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                removerPena();
+            }
+        });
+    </script>
+    """)
     
     # Rodapé
     html_content.append("""

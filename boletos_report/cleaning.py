@@ -189,12 +189,12 @@ def remove_duplicates_by_pena_month(df: pd.DataFrame) -> pd.DataFrame:
     mask_valido = (
         df['pena_agua'].notna() & 
         (pena_str != '') &
-        (pena_str.lower() != 'nan') &
-        (pena_str.lower() != 'none') &
+        (pena_str.str.lower() != 'nan') &
+        (pena_str.str.lower() != 'none') &
         df['mes_referencia'].notna() &
         (mes_str != '') &
-        (mes_str.lower() != 'nan') &
-        (mes_str.lower() != 'none')
+        (mes_str.str.lower() != 'nan') &
+        (mes_str.str.lower() != 'none')
     )
     
     df_validos = df[mask_valido].copy()
