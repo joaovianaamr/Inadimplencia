@@ -255,6 +255,41 @@ def generate_html_report(
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.05); }
         }
+        table#debtorsTable th {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            padding-right: 25px;
+        }
+        table#debtorsTable th:hover {
+            background-color: #e3f2fd;
+        }
+        table#debtorsTable th.sortable::after {
+            content: ' ↕';
+            position: absolute;
+            right: 8px;
+            opacity: 0.5;
+            font-size: 12px;
+        }
+        table#debtorsTable th.sort-asc::after {
+            content: ' ↑';
+            opacity: 1;
+            color: #1976d2;
+        }
+        table#debtorsTable th.sort-desc::after {
+            content: ' ↓';
+            opacity: 1;
+            color: #1976d2;
+        }
+        table#debtorsTable td {
+            white-space: nowrap;
+        }
+        table#debtorsTable td:nth-child(5) {
+            text-align: right;
+        }
+        table#debtorsTable td:nth-child(6) {
+            text-align: center;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -656,15 +691,18 @@ def generate_html_report(
         <h2>7. Lista Completa de Devedores em Aberto</h2>
         <p><em>Lista completa ordenada por valor em aberto (maior para menor). Use para verificação se realmente estão em aberto.</em></p>
         <table id="debtorsTable">
+            <thead>
             <tr>
                 <th style="width: 50px;">Ação</th>
-                <th>Pena de Água</th>
-                <th>Nome</th>
-                <th>Banco</th>
-                <th>Valor em Aberto</th>
-                <th>Qtd Boletos</th>
-                <th>Meses</th>
+                <th class="sortable" data-sort="pena" data-type="number">Pena de Água</th>
+                <th class="sortable" data-sort="nome" data-type="text">Nome</th>
+                <th class="sortable" data-sort="banco" data-type="text">Banco</th>
+                <th class="sortable sort-desc" data-sort="valor" data-type="number">Valor em Aberto</th>
+                <th class="sortable" data-sort="qtd" data-type="number">Qtd Boletos</th>
+                <th class="sortable" data-sort="mes" data-type="text">Meses</th>
             </tr>
+            </thead>
+            <tbody>
 """)
     
     # Obter todos os devedores em aberto - uma linha por pena + mês
@@ -683,22 +721,22 @@ def generate_html_report(
             # Criar ID único para esta combinação pena + mês
             unique_id = f"{row['pena_agua']}_{row['mes']}"
             html_content.append(f"""
-            <tr class="debtor-row" data-pena="{row['pena_agua']}" data-mes="{row['mes']}" data-unique-id="{unique_id}">
+            <tr class="debtor-row" data-pena="{row['pena_agua']}" data-mes="{row['mes']}" data-unique-id="{unique_id}" data-valor="{row['valor_total']}" data-qtd="{int(row['qtd_boletos'])}">
                 <td>
                     <button class="remove-btn" onclick="removerPenaPorMes('{row['pena_agua']}', '{row['mes']}', event)" title="Dar baixa apenas deste mês">−</button>
                 </td>
-                <td><strong>{row['pena_agua']}</strong></td>
-                <td>{row['nome']}</td>
-                <td>{row['banco']}</td>
-                <td>{format_currency(row['valor_total'])}</td>
-                <td>{int(row['qtd_boletos'])}</td>
-                <td>{row['mes']}</td>
+                <td data-value="{row['pena_agua']}"><strong>{row['pena_agua']}</strong></td>
+                <td data-value="{repr(row['nome'])}">{row['nome']}</td>
+                <td data-value="{repr(row['banco'])}">{row['banco']}</td>
+                <td data-value="{row['valor_total']}">{format_currency(row['valor_total'])}</td>
+                <td data-value="{int(row['qtd_boletos'])}">{int(row['qtd_boletos'])}</td>
+                <td data-value="{repr(str(row['mes']))}">{row['mes']}</td>
             </tr>
 """)
     else:
         html_content.append("<tr><td colspan='7'>Nenhum devedor em aberto encontrado.</td></tr>")
     
-    html_content.append("</table>")
+    html_content.append("</tbody></table>")
     
     # JavaScript para interatividade
     # Preparar dados temporais para o gráfico
@@ -1252,6 +1290,85 @@ def generate_html_report(
         } else {
             initDebtChart();
         }
+        
+        // Função de ordenação de tabela
+        let currentSort = { column: 'valor', direction: 'desc' };
+        
+        function sortTable(columnIndex, sortType) {
+            const table = document.getElementById('debtorsTable');
+            const tbody = table.querySelector('tbody') || table;
+            const rows = Array.from(tbody.querySelectorAll('tr.debtor-row'));
+            const header = table.querySelectorAll('th')[columnIndex];
+            
+            if (!header || !header.classList.contains('sortable')) return;
+            
+            // Remover classes de ordenação de todos os cabeçalhos
+            headers.forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+            });
+            
+            // Determinar direção da ordenação
+            if (currentSort.column === columnIndex && currentSort.direction === 'asc') {
+                currentSort.direction = 'desc';
+            } else {
+                currentSort.direction = 'asc';
+            }
+            currentSort.column = columnIndex;
+            
+            // Adicionar classe ao cabeçalho atual
+            header.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc');
+            
+            // Ordenar linhas
+            rows.sort((a, b) => {
+                const aCell = a.cells[columnIndex];
+                const bCell = b.cells[columnIndex];
+                
+                if (!aCell || !bCell) return 0;
+                
+                let aValue, bValue;
+                
+                if (sortType === 'number') {
+                    // Para números, usar data-value ou parsear o texto
+                    const aData = aCell.getAttribute('data-value');
+                    const bData = bCell.getAttribute('data-value');
+                    if (aData) {
+                        aValue = parseFloat(aData) || 0;
+                    } else {
+                        aValue = parseFloat(aCell.textContent.replace(/[^\\d,.-]/g, '').replace(',', '.')) || 0;
+                    }
+                    if (bData) {
+                        bValue = parseFloat(bData) || 0;
+                    } else {
+                        bValue = parseFloat(bCell.textContent.replace(/[^\\d,.-]/g, '').replace(',', '.')) || 0;
+                    }
+                } else {
+                    // Para texto, usar data-value ou textContent
+                    aValue = (aCell.getAttribute('data-value') || aCell.textContent).trim().toLowerCase();
+                    bValue = (bCell.getAttribute('data-value') || bCell.textContent).trim().toLowerCase();
+                }
+                
+                if (aValue < bValue) return currentSort.direction === 'asc' ? -1 : 1;
+                if (aValue > bValue) return currentSort.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+            
+            // Reordenar no DOM
+            rows.forEach(row => tbody.appendChild(row));
+        }
+        
+        // Adicionar event listeners aos cabeçalhos ordenáveis
+        document.addEventListener('DOMContentLoaded', function() {
+            const table = document.getElementById('debtorsTable');
+            if (table) {
+                const headers = table.querySelectorAll('th.sortable');
+                headers.forEach((header, index) => {
+                    header.addEventListener('click', function() {
+                        const sortType = this.getAttribute('data-type') || 'text';
+                        sortTable(index, sortType);
+                    });
+                });
+            }
+        });
     </script>
     """)
     
