@@ -270,16 +270,19 @@ def generate_html_report(
             right: 8px;
             opacity: 0.5;
             font-size: 12px;
+            color: white;
         }
         table#debtorsTable th.sort-asc::after {
             content: ' ↑';
             opacity: 1;
-            color: #1976d2;
+            color: #ffeb3b;
+            font-weight: bold;
         }
         table#debtorsTable th.sort-desc::after {
             content: ' ↓';
             opacity: 1;
-            color: #1976d2;
+            color: #ffeb3b;
+            font-weight: bold;
         }
         table#debtorsTable td {
             white-space: nowrap;
@@ -1292,13 +1295,18 @@ def generate_html_report(
         }
         
         // Função de ordenação de tabela
-        let currentSort = { column: 'valor', direction: 'desc' };
+        let currentSort = { column: 4, direction: 'desc' }; // Coluna 4 = Valor em Aberto (índice 0-based)
         
         function sortTable(columnIndex, sortType) {
             const table = document.getElementById('debtorsTable');
-            const tbody = table.querySelector('tbody') || table;
+            if (!table) return;
+            
+            const tbody = table.querySelector('tbody');
+            if (!tbody) return;
+            
             const rows = Array.from(tbody.querySelectorAll('tr.debtor-row'));
-            const header = table.querySelectorAll('th')[columnIndex];
+            const headers = table.querySelectorAll('thead th');
+            const header = headers[columnIndex];
             
             if (!header || !header.classList.contains('sortable')) return;
             
@@ -1357,18 +1365,40 @@ def generate_html_report(
         }
         
         // Adicionar event listeners aos cabeçalhos ordenáveis
-        document.addEventListener('DOMContentLoaded', function() {
+        function initTableSorting() {
             const table = document.getElementById('debtorsTable');
-            if (table) {
-                const headers = table.querySelectorAll('th.sortable');
-                headers.forEach((header, index) => {
-                    header.addEventListener('click', function() {
+            if (!table) return;
+            
+            const allHeaders = table.querySelectorAll('thead th');
+            const sortableHeaders = table.querySelectorAll('thead th.sortable');
+            
+            sortableHeaders.forEach((header) => {
+                // Encontrar o índice real da coluna (incluindo coluna Ação)
+                let columnIndex = -1;
+                for (let i = 0; i < allHeaders.length; i++) {
+                    if (allHeaders[i] === header) {
+                        columnIndex = i;
+                        break;
+                    }
+                }
+                
+                if (columnIndex >= 0) {
+                    header.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
                         const sortType = this.getAttribute('data-type') || 'text';
-                        sortTable(index, sortType);
+                        sortTable(columnIndex, sortType);
                     });
-                });
-            }
-        });
+                }
+            });
+        }
+        
+        // Inicializar quando a página carregar
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initTableSorting);
+        } else {
+            initTableSorting();
+        }
     </script>
     """)
     
