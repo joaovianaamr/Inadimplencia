@@ -127,16 +127,36 @@ def main():
         logger.error(f"Caminho de entrada não encontrado: {args.input}")
         sys.exit(1)
     
-    # Criar diretório de saída com timestamp único para cada execução
+    # Criar diretório de saída com numeração sequencial
     base_output = Path(args.output)
     base_output.mkdir(parents=True, exist_ok=True)
     
-    # Criar pasta única com timestamp para esta execução
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = base_output / f"relatorio_{timestamp}"
+    # Encontrar o próximo número disponível
+    existing_reports = []
+    for item in base_output.iterdir():
+        if item.is_dir() and item.name.startswith("relatorio_"):
+            # Tentar extrair o número do nome
+            try:
+                # Formato: relatorio_1, relatorio_2, etc.
+                if item.name.startswith("relatorio_"):
+                    num_str = item.name.replace("relatorio_", "")
+                    # Verificar se é um número
+                    if num_str.isdigit():
+                        existing_reports.append(int(num_str))
+            except (ValueError, AttributeError):
+                continue
+    
+    # Encontrar o próximo número disponível
+    if existing_reports:
+        next_number = max(existing_reports) + 1
+    else:
+        next_number = 1
+    
+    # Criar pasta com número sequencial
+    output_path = base_output / f"relatorio_{next_number}"
     output_path.mkdir(parents=True, exist_ok=True)
     logger.info(f"Diretório de saída: {output_path}")
-    logger.info(f"Relatório único criado: relatorio_{timestamp}")
+    logger.info(f"Relatório criado: relatorio_{next_number}")
     
     # Parse formatos
     formats = [f.strip().lower() for f in args.format.split(',')]
