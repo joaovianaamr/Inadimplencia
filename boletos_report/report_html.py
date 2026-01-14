@@ -667,30 +667,32 @@ def generate_html_report(
             </tr>
 """)
     
-    # Obter todos os devedores em aberto ordenados por valor total
+    # Obter todos os devedores em aberto - uma linha por pena + mês
     df_open = df_clean[df_clean['status_categoria'] == 'OPEN'].copy()
-    devedores_completos = pd.DataFrame()
+    devedores_por_mes = pd.DataFrame()
     
     if len(df_open) > 0:
-        devedores_completos = df_open.groupby(['pena_agua', 'nome_pagador', 'banco']).agg({
-            'valor_float': ['sum', 'count'],
-            'mes_referencia': lambda x: ', '.join(sorted(x.unique()))
+        # Agrupar por pena, nome, banco E mês para ter uma linha por mês
+        devedores_por_mes = df_open.groupby(['pena_agua', 'nome_pagador', 'banco', 'mes_referencia']).agg({
+            'valor_float': ['sum', 'count']
         }).reset_index()
-        devedores_completos.columns = ['pena_agua', 'nome', 'banco', 'valor_total', 'qtd_boletos', 'meses']
-        devedores_completos = devedores_completos.sort_values('valor_total', ascending=False)
+        devedores_por_mes.columns = ['pena_agua', 'nome', 'banco', 'mes', 'valor_total', 'qtd_boletos']
+        devedores_por_mes = devedores_por_mes.sort_values('valor_total', ascending=False)
         
-        for _, row in devedores_completos.iterrows():
+        for _, row in devedores_por_mes.iterrows():
+            # Criar ID único para esta combinação pena + mês
+            unique_id = f"{row['pena_agua']}_{row['mes']}"
             html_content.append(f"""
-            <tr class="debtor-row" data-pena="{row['pena_agua']}">
+            <tr class="debtor-row" data-pena="{row['pena_agua']}" data-mes="{row['mes']}" data-unique-id="{unique_id}">
                 <td>
-                    <button class="remove-btn" onclick="removerPenaPorBotao('{row['pena_agua']}', event)" title="Dar baixa desta pena">−</button>
+                    <button class="remove-btn" onclick="removerPenaPorMes('{row['pena_agua']}', '{row['mes']}', event)" title="Dar baixa apenas deste mês">−</button>
                 </td>
                 <td><strong>{row['pena_agua']}</strong></td>
                 <td>{row['nome']}</td>
                 <td>{row['banco']}</td>
                 <td>{format_currency(row['valor_total'])}</td>
                 <td>{int(row['qtd_boletos'])}</td>
-                <td>{row['meses']}</td>
+                <td>{row['mes']}</td>
             </tr>
 """)
     else:
@@ -731,9 +733,17 @@ def generate_html_report(
 """)
     
     # Adicionar dados dos devedores em formato JSON
-    if len(devedores_completos) > 0:
+    # Para busca por pena (remove todos os meses)
+    devedores_agrupados = pd.DataFrame()
+    if len(df_open) > 0:
+        devedores_agrupados = df_open.groupby(['pena_agua', 'nome_pagador', 'banco']).agg({
+            'valor_float': ['sum', 'count']
+        }).reset_index()
+        devedores_agrupados.columns = ['pena_agua', 'nome', 'banco', 'valor_total', 'qtd_boletos']
+    
+    if len(devedores_agrupados) > 0:
         devedores_json = []
-        for _, row in devedores_completos.iterrows():
+        for _, row in devedores_agrupados.iterrows():
             devedores_json.append(f"""            "{row['pena_agua']}": {{
                 "nome": {repr(row['nome'])},
                 "banco": {repr(row['banco'])},
@@ -741,6 +751,28 @@ def generate_html_report(
                 "qtd_boletos": {int(row['qtd_boletos'])}
             }}""")
         html_content.append(',\n'.join(devedores_json))
+    
+    html_content.append("""
+        };
+        
+        // Dados dos devedores por mês (para remoção individual)
+        const devedoresPorMesData = {
+""")
+    
+    # Adicionar dados por pena + mês
+    if len(devedores_por_mes) > 0:
+        devedores_mes_json = []
+        for _, row in devedores_por_mes.iterrows():
+            unique_id = f"{row['pena_agua']}_{row['mes']}"
+            devedores_mes_json.append(f"""            "{unique_id}": {{
+                "pena": {repr(str(row['pena_agua']))},
+                "nome": {repr(row['nome'])},
+                "banco": {repr(row['banco'])},
+                "mes": {repr(str(row['mes']))},
+                "valor": {row['valor_total']},
+                "qtd_boletos": {int(row['qtd_boletos'])}
+            }}""")
+        html_content.append(',\n'.join(devedores_mes_json))
     
     html_content.append("""
         };
@@ -791,14 +823,33 @@ def generate_html_report(
         }
         
         function updateMaxMinDebt() {
-            // Filtrar devedores não removidos
-            const devedoresAtivos = Object.entries(devedoresData)
-                .filter(([pena, data]) => !removedPenas.has(pena))
-                .map(([pena, data]) => ({
-                    pena: pena,
-                    nome: data.nome,
-                    valor: data.valor
-                }));
+            // Calcular valores atuais considerando remoções completas e por mês
+            const valoresAtuais = {};
+            
+            // Inicializar com valores completos (não removidos)
+            Object.entries(devedoresData).forEach(([pena, data]) => {
+                if (!removedPenas.has(pena)) {
+                    valoresAtuais[pena] = {
+                        pena: pena,
+                        nome: data.nome,
+                        valor: data.valor
+                    };
+                }
+            });
+            
+            // Subtrair valores removidos por mês
+            removedPenasPorMes.forEach(uniqueId => {
+                if (devedoresPorMesData[uniqueId]) {
+                    const data = devedoresPorMesData[uniqueId];
+                    if (!removedPenas.has(data.pena) && valoresAtuais[data.pena]) {
+                        valoresAtuais[data.pena].valor -= data.valor;
+                    }
+                }
+            });
+            
+            // Filtrar apenas os que ainda têm valor > 0
+            const devedoresAtivos = Object.values(valoresAtuais)
+                .filter(d => d.valor > 0);
             
             if (devedoresAtivos.length === 0) {
                 // Se não há devedores ativos, limpar a tabela
@@ -908,7 +959,7 @@ def generate_html_report(
             }
         }
         
-        function removerPenaPorBotao(pena, event) {
+        function removerPenaPorMes(pena, mes, event) {
             if (event) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -917,9 +968,41 @@ def generate_html_report(
             // Salvar posição atual do scroll
             const scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
             
-            removerPena(pena);
+            const uniqueId = `${pena}_${mes}`;
             
-            // Restaurar posição do scroll após um pequeno delay para garantir que o DOM foi atualizado
+            if (!devedoresPorMesData[uniqueId]) {
+                alert('Registro não encontrado.');
+                return false;
+            }
+            
+            if (removedPenasPorMes.has(uniqueId)) {
+                alert('Este mês já foi removido.');
+                return false;
+            }
+            
+            // Se a pena completa já foi removida, não pode remover por mês
+            if (removedPenas.has(pena)) {
+                alert('Esta pena já foi removida completamente.');
+                return false;
+            }
+            
+            removedPenasPorMes.add(uniqueId);
+            
+            // Marcar linha na tabela e desabilitar botão
+            const row = document.querySelector(`tr[data-unique-id="${uniqueId}"]`);
+            if (row) {
+                row.classList.add('removed');
+                const btn = row.querySelector('.remove-btn');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.5';
+                }
+            }
+            
+            updateMetrics();
+            updateRemovedList();
+            
+            // Restaurar posição do scroll
             setTimeout(() => {
                 window.scrollTo(0, scrollPosition);
             }, 10);
@@ -928,15 +1011,17 @@ def generate_html_report(
         }
         
         function resetarBaixas() {
-            if (removedPenas.size === 0) {
+            const totalBaixas = removedPenas.size + removedPenasPorMes.size;
+            if (totalBaixas === 0) {
                 alert('Nenhuma baixa para resetar.');
                 return;
             }
             
-            if (!confirm(`Deseja resetar todas as ${removedPenas.size} baixa(s) manual(is)?`)) {
+            if (!confirm(`Deseja resetar todas as ${totalBaixas} baixa(s) manual(is)?`)) {
                 return;
             }
             
+            // Resetar penas completas
             removedPenas.forEach(pena => {
                 const rows = document.querySelectorAll(`tr[data-pena="${pena}"]`);
                 rows.forEach(row => {
@@ -949,7 +1034,21 @@ def generate_html_report(
                 });
             });
             
+            // Resetar penas por mês
+            removedPenasPorMes.forEach(uniqueId => {
+                const row = document.querySelector(`tr[data-unique-id="${uniqueId}"]`);
+                if (row) {
+                    row.classList.remove('removed');
+                    const btn = row.querySelector('.remove-btn');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                    }
+                }
+            });
+            
             removedPenas.clear();
+            removedPenasPorMes.clear();
             updateMetrics(); // Isso já chama updateMaxMinDebt()
             updateRemovedList();
         }
@@ -957,19 +1056,27 @@ def generate_html_report(
         function updateRemovedList() {
             const container = document.getElementById('removedPenas');
             
-            if (removedPenas.size === 0) {
+            if (removedPenas.size === 0 && removedPenasPorMes.size === 0) {
                 container.innerHTML = '';
                 return;
             }
             
             let html = '<p><strong>Penas removidas:</strong> ';
-            const penasArray = Array.from(removedPenas);
-            penasArray.forEach((pena, index) => {
+            const badges = [];
+            
+            // Adicionar penas completas
+            removedPenas.forEach(pena => {
                 const data = devedoresData[pena];
-                html += `<span class="removed-badge">${pena} (${data.nome.substring(0, 30)}${data.nome.length > 30 ? '...' : ''})</span>`;
-                if (index < penasArray.length - 1) html += ' ';
+                badges.push(`<span class="removed-badge">${pena} (${data.nome.substring(0, 30)}${data.nome.length > 30 ? '...' : ''}) - TODOS OS MESES</span>`);
             });
-            html += '</p>';
+            
+            // Adicionar penas por mês
+            removedPenasPorMes.forEach(uniqueId => {
+                const data = devedoresPorMesData[uniqueId];
+                badges.push(`<span class="removed-badge">${data.pena} (${data.nome.substring(0, 30)}${data.nome.length > 30 ? '...' : ''}) - ${data.mes}</span>`);
+            });
+            
+            html += badges.join(' ') + '</p>';
             container.innerHTML = html;
         }
         
