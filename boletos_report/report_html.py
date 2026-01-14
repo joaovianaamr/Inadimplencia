@@ -1027,7 +1027,7 @@ def generate_html_report(
             saveRemovalsToHTML();
             
             // Obter o HTML completo da página
-            const htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+            const htmlContent = '<!DOCTYPE html>' + String.fromCharCode(10) + document.documentElement.outerHTML;
             
             // Criar blob e fazer download
             const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
