@@ -255,6 +255,26 @@ def generate_html_report(
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.05); }
         }
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
         table#debtorsTable th {
             cursor: pointer;
             user-select: none;
@@ -331,6 +351,9 @@ def generate_html_report(
             </div>
             <div id="removedPenas" style="margin-top: 10px;"></div>
             <div id="saveStatus" style="margin-top: 10px; font-size: 14px; color: #4caf50; display: none;"></div>
+        </div>
+        <div id="toastNotification" style="position: fixed; top: 20px; right: 20px; background-color: #4caf50; color: white; padding: 20px 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 10000; display: none; font-size: 16px; font-weight: bold; animation: slideIn 0.3s ease-out;">
+            ✓ Mudanças salvas com sucesso!
         </div>
     """)
     
@@ -1002,12 +1025,15 @@ def generate_html_report(
         function salvarMudancas() {
             const btnSalvar = document.getElementById('btnSalvar');
             const saveStatus = document.getElementById('saveStatus');
+            const toastNotification = document.getElementById('toastNotification');
             
             // Salvar no localStorage e HTML
             saveRemovals();
             saveRemovalsToHTML();
             
-            // Feedback visual
+            const totalBaixas = removedPenas.size + removedPenasPorMes.size;
+            
+            // Feedback visual no botão
             if (btnSalvar) {
                 btnSalvar.style.backgroundColor = '#81c784';
                 btnSalvar.textContent = '✓ Salvo!';
@@ -1017,20 +1043,38 @@ def generate_html_report(
                 }, 2000);
             }
             
+            // Mensagem de status abaixo dos botões
             if (saveStatus) {
-                const totalBaixas = removedPenas.size + removedPenasPorMes.size;
                 saveStatus.textContent = `✓ Mudanças salvas com sucesso! (${totalBaixas} baixa(s) salva(s))`;
                 saveStatus.style.display = 'block';
                 saveStatus.style.color = '#4caf50';
+                saveStatus.style.fontWeight = 'bold';
+                saveStatus.style.padding = '10px';
+                saveStatus.style.backgroundColor = '#e8f5e9';
+                saveStatus.style.borderRadius = '4px';
+                saveStatus.style.border = '2px solid #4caf50';
                 
                 setTimeout(() => {
                     saveStatus.style.display = 'none';
-                }, 3000);
+                }, 4000);
             }
             
-            // Tentar fazer download do HTML atualizado (opcional)
-            // Nota: Isso requer que o usuário salve manualmente o arquivo
-            console.log('Mudanças salvas. Para persistir no arquivo, salve o HTML manualmente (Ctrl+S ou Cmd+S)');
+            // Toast notification (aviso destacado no canto superior direito)
+            if (toastNotification) {
+                toastNotification.textContent = `✓ Mudanças salvas com sucesso! (${totalBaixas} baixa(s) salva(s))`;
+                toastNotification.style.display = 'block';
+                toastNotification.style.animation = 'slideIn 0.3s ease-out';
+                
+                setTimeout(() => {
+                    toastNotification.style.animation = 'slideOut 0.3s ease-out';
+                    setTimeout(() => {
+                        toastNotification.style.display = 'none';
+                    }, 300);
+                }, 3500);
+            }
+            
+            // Alerta do navegador (opcional, mais visível)
+            alert(`✓ Mudanças salvas com sucesso!\n\n${totalBaixas} baixa(s) foram salvas.\n\nAs mudanças foram salvas no navegador e no arquivo HTML.`);
         }
         
         function formatCurrency(value) {
