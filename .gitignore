@@ -33,10 +33,13 @@ env/
 *~
 
 # Output
-relatorios/
+relatorios/*
+!relatorios/.gitkeep
+!relatorios/README.md
 *.html
 *.xlsx
 *.csv
+!exemplo_boletos.csv
 charts/
 *.png
 
