@@ -1297,6 +1297,27 @@ def generate_html_report(
         // Função de ordenação de tabela
         let currentSort = { column: 4, direction: 'desc' }; // Coluna 4 = Valor em Aberto (índice 0-based)
         
+        function getCellValue(cell, sortType) {
+            if (!cell) return sortType === 'number' ? 0 : '';
+            
+            const dataValue = cell.getAttribute('data-value');
+            if (dataValue !== null) {
+                if (sortType === 'number') {
+                    return parseFloat(dataValue) || 0;
+                } else {
+                    return dataValue.trim().toLowerCase();
+                }
+            }
+            
+            // Fallback: parsear do texto
+            if (sortType === 'number') {
+                const text = cell.textContent.replace(/[^\\d,.-]/g, '').replace(',', '.');
+                return parseFloat(text) || 0;
+            } else {
+                return cell.textContent.trim().toLowerCase();
+            }
+        }
+        
         function sortTable(columnIndex, sortType) {
             const table = document.getElementById('debtorsTable');
             if (!table) return;
@@ -1315,10 +1336,12 @@ def generate_html_report(
                 th.classList.remove('sort-asc', 'sort-desc');
             });
             
-            // Determinar direção da ordenação
-            if (currentSort.column === columnIndex && currentSort.direction === 'asc') {
-                currentSort.direction = 'desc';
+            // Determinar direção da ordenação: alterna entre asc e desc
+            if (currentSort.column === columnIndex) {
+                // Mesma coluna: alterna direção
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
             } else {
+                // Nova coluna: começa com asc
                 currentSort.direction = 'asc';
             }
             currentSort.column = columnIndex;
@@ -1331,33 +1354,30 @@ def generate_html_report(
                 const aCell = a.cells[columnIndex];
                 const bCell = b.cells[columnIndex];
                 
-                if (!aCell || !bCell) return 0;
+                let aValue = getCellValue(aCell, sortType);
+                let bValue = getCellValue(bCell, sortType);
                 
-                let aValue, bValue;
-                
-                if (sortType === 'number') {
-                    // Para números, usar data-value ou parsear o texto
-                    const aData = aCell.getAttribute('data-value');
-                    const bData = bCell.getAttribute('data-value');
-                    if (aData) {
-                        aValue = parseFloat(aData) || 0;
-                    } else {
-                        aValue = parseFloat(aCell.textContent.replace(/[^\\d,.-]/g, '').replace(',', '.')) || 0;
-                    }
-                    if (bData) {
-                        bValue = parseFloat(bData) || 0;
-                    } else {
-                        bValue = parseFloat(bCell.textContent.replace(/[^\\d,.-]/g, '').replace(',', '.')) || 0;
-                    }
-                } else {
-                    // Para texto, usar data-value ou textContent
-                    aValue = (aCell.getAttribute('data-value') || aCell.textContent).trim().toLowerCase();
-                    bValue = (bCell.getAttribute('data-value') || bCell.textContent).trim().toLowerCase();
+                // Comparação principal
+                let comparison = 0;
+                if (aValue < bValue) {
+                    comparison = -1;
+                } else if (aValue > bValue) {
+                    comparison = 1;
                 }
                 
-                if (aValue < bValue) return currentSort.direction === 'asc' ? -1 : 1;
-                if (aValue > bValue) return currentSort.direction === 'asc' ? 1 : -1;
-                return 0;
+                // Se valores são iguais e é Qtd Boletos (coluna 5) ou Meses (coluna 6), ordenar por Pena de Água (coluna 1)
+                if (comparison === 0 && (columnIndex === 5 || columnIndex === 6)) {
+                    const aPenaCell = a.cells[1];
+                    const bPenaCell = b.cells[1];
+                    const aPena = getCellValue(aPenaCell, 'number');
+                    const bPena = getCellValue(bPenaCell, 'number');
+                    
+                    if (aPena < bPena) comparison = -1;
+                    else if (aPena > bPena) comparison = 1;
+                }
+                
+                // Aplicar direção da ordenação
+                return currentSort.direction === 'asc' ? comparison : -comparison;
             });
             
             // Reordenar no DOM
