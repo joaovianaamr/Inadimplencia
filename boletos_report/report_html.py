@@ -1341,8 +1341,8 @@ def generate_html_report(
                 // Mesma coluna: alterna direção
                 currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
             } else {
-                // Nova coluna: começa com asc
-                currentSort.direction = 'asc';
+                // Nova coluna: números começam com desc (maior->menor), texto com asc (alfabética)
+                currentSort.direction = sortType === 'number' ? 'desc' : 'asc';
             }
             currentSort.column = columnIndex;
             
