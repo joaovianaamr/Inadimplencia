@@ -255,12 +255,24 @@ def generate_html_report(
             50% { transform: scale(1.05); }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div class="container">
         <h1>📊 Relatório de Inadimplência</h1>
         <p><strong>Data de geração:</strong> """ + datetime.now().strftime("%d/%m/%Y %H:%M:%S") + """</p>
 """)
+    
+    # Gráfico de Evolução da Dívida Total
+    html_content.append("""
+        <div style="background-color: white; border: 2px solid #1976d2; border-radius: 8px; padding: 25px; margin: 30px 0;">
+            <h2 style="margin-top: 0; color: #1976d2; text-align: center;">📈 Evolução da Dívida Total ao Longo dos Meses</h2>
+            <div style="position: relative; height: 400px; margin: 20px 0;">
+                <canvas id="debtEvolutionChart"></canvas>
+            </div>
+            <div id="debtEvolutionValues" style="margin-top: 20px; text-align: center; font-size: 14px; color: #555;"></div>
+        </div>
+    """)
     
     # Painel Interativo de Baixa Manual
     html_content.append("""
@@ -685,8 +697,25 @@ def generate_html_report(
     html_content.append("</table>")
     
     # JavaScript para interatividade
+    # Preparar dados temporais para o gráfico
+    temporal_data_js = []
+    if len(temporal_df) > 0:
+        for _, row in temporal_df.iterrows():
+            temporal_data_js.append(f"""            {{
+                "mes": {repr(str(row['mes_referencia']))},
+                "divida": {row['soma_divida_open']}
+            }}""")
+    
     html_content.append("""
     <script>
+        // Dados temporais para o gráfico
+        const temporalData = [
+""")
+    if temporal_data_js:
+        html_content.append(',\n'.join(temporal_data_js))
+    html_content.append("""
+        ];
+        
         // Dados originais
         const originalData = {
             devedores: """ + str(metrics['total_devedores_unicos']) + """,
@@ -948,6 +977,146 @@ def generate_html_report(
                 removerPena();
             }
         });
+        
+        // Criar gráfico de evolução da dívida
+        let debtChart = null;
+        
+        function initDebtChart() {
+            const ctx = document.getElementById('debtEvolutionChart');
+            if (!ctx || temporalData.length === 0) {
+                return;
+            }
+            
+            const meses = temporalData.map(d => d.mes);
+            const valores = temporalData.map(d => d.divida);
+            
+            // Atualizar valores exibidos
+            const valuesContainer = document.getElementById('debtEvolutionValues');
+            if (valuesContainer) {
+                let html = '<div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 15px;">';
+                temporalData.forEach(d => {
+                    html += `<div style="background-color: #f0f0f0; padding: 8px 15px; border-radius: 5px; border-left: 4px solid #1976d2;"><strong>${d.mes}:</strong> ${formatCurrency(d.divida)}</div>`;
+                });
+                html += '</div>';
+                valuesContainer.innerHTML = html;
+            }
+            
+            debtChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: meses,
+                    datasets: [{
+                        label: 'Dívida Total (R$)',
+                        data: valores,
+                        borderColor: '#d32f2f',
+                        backgroundColor: 'rgba(211, 47, 47, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 6,
+                        pointHoverRadius: 8,
+                        pointBackgroundColor: '#d32f2f',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Evolução da Dívida Total por Mês',
+                            font: {
+                                size: 18,
+                                weight: 'bold'
+                            },
+                            color: '#1976d2',
+                            padding: 20
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                },
+                                padding: 15
+                            }
+                        },
+                        tooltip: {
+                            enabled: true,
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleFont: {
+                                size: 14,
+                                weight: 'bold'
+                            },
+                            bodyFont: {
+                                size: 13
+                            },
+                            padding: 12,
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Dívida: ' + formatCurrency(context.parsed.y);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Valor em R$',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                },
+                                color: '#555'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return formatCurrency(value);
+                                },
+                                font: {
+                                    size: 12
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Mês de Referência',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                },
+                                color: '#555'
+                            },
+                            ticks: {
+                                font: {
+                                    size: 12
+                                }
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Inicializar gráfico quando a página carregar
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initDebtChart);
+        } else {
+            initDebtChart();
+        }
     </script>
     """)
     
