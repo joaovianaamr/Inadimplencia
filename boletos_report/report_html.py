@@ -777,7 +777,8 @@ def generate_html_report(
     html_content.append("""
         };
         
-        const removedPenas = new Set();
+        const removedPenas = new Set(); // Pena completa (todos os meses)
+        const removedPenasPorMes = new Set(); // Pena + mês específico
         
         function formatCurrency(value) {
             return 'R$ ' + value.toFixed(2).replace('.', ',').replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.');
