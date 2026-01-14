@@ -37,7 +37,8 @@ def generate_html_report(
     data_quality: Dict[str, Any],
     status_classifier,
     df_clean: pd.DataFrame,
-    output_dir: str
+    output_dir: str,
+    report_number: int
 ):
     """
     Gera relatório HTML completo.
@@ -260,6 +261,7 @@ def generate_html_report(
 <body>
     <div class="container">
         <h1>📊 Relatório de Inadimplência</h1>
+        <p><strong>Número do Relatório:</strong> relatorio_""" + str(report_number) + """</p>
         <p><strong>Data de geração:</strong> """ + datetime.now().strftime("%d/%m/%Y %H:%M:%S") + """</p>
 """)
     

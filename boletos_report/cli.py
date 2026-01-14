@@ -155,6 +155,7 @@ def main():
     # Criar pasta com número sequencial
     output_path = base_output / f"relatorio_{next_number}"
     output_path.mkdir(parents=True, exist_ok=True)
+    report_number = next_number
     logger.info(f"Diretório de saída: {output_path}")
     logger.info(f"Relatório criado: relatorio_{next_number}")
     
@@ -272,7 +273,8 @@ def main():
                 data_quality,
                 status_classifier,
                 df_clean,
-                str(output_path)
+                str(output_path),
+                report_number
             )
         
         # 8. Exportar resumos
