@@ -872,135 +872,135 @@ def generate_html_report(
         const storageKey = 'relatorio_baixas_' + report_number;
         
         // Função para salvar remoções no localStorage
-        function saveRemovals() {{
-            const data = {{
+        function saveRemovals() {
+            const data = {
                 removedPenas: Array.from(removedPenas),
                 removedPenasPorMes: Array.from(removedPenasPorMes),
                 timestamp: new Date().toISOString()
-            }};
-            try {{
+            };
+            try {
                 localStorage.setItem(storageKey, JSON.stringify(data));
-            }} catch (e) {{
+            } catch (e) {
                 console.warn('Não foi possível salvar no localStorage:', e);
-            }}
-        }}
+            }
+        }
         
         // Função para salvar remoções no HTML (para portabilidade)
-        function saveRemovalsToHTML() {{
-            const data = {{
+        function saveRemovalsToHTML() {
+            const data = {
                 removedPenas: Array.from(removedPenas),
                 removedPenasPorMes: Array.from(removedPenasPorMes),
                 timestamp: new Date().toISOString()
-            }};
+            };
             
             // Criar ou atualizar elemento script com os dados
             let scriptEl = document.getElementById('saved-removals-data');
-            if (!scriptEl) {{
+            if (!scriptEl) {
                 scriptEl = document.createElement('script');
                 scriptEl.id = 'saved-removals-data';
                 scriptEl.type = 'application/json';
                 document.head.appendChild(scriptEl);
-            }}
+            }
             scriptEl.textContent = JSON.stringify(data);
-        }}
+        }
         
         // Função para carregar remoções do localStorage ou HTML
-        function loadRemovals() {{
+        function loadRemovals() {
             let data = null;
             
             // Tentar carregar do script inline no HTML primeiro (portabilidade)
             const scriptEl = document.getElementById('saved-removals-data');
-            if (scriptEl && scriptEl.textContent) {{
-                try {{
+            if (scriptEl && scriptEl.textContent) {
+                try {
                     data = JSON.parse(scriptEl.textContent);
                     console.log('Baixas carregadas do HTML');
-                }} catch (e) {{
+                } catch (e) {
                     console.warn('Erro ao ler dados do HTML:', e);
-                }}
-            }}
+                }
+            }
             
             // Se não encontrou no HTML, tentar localStorage
-            if (!data) {{
-                try {{
+            if (!data) {
+                try {
                     const saved = localStorage.getItem(storageKey);
-                    if (saved) {{
+                    if (saved) {
                         data = JSON.parse(saved);
                         console.log('Baixas carregadas do localStorage');
-                    }}
-                }} catch (e) {{
+                    }
+                } catch (e) {
                     console.warn('Erro ao ler do localStorage:', e);
-                }}
-            }}
+                }
+            }
             
-            if (!data) {{
+            if (!data) {
                 return; // Nenhum dado salvo
-            }}
+            }
             
             // Restaurar penas removidas completamente
-            if (data.removedPenas && Array.isArray(data.removedPenas)) {{
-                data.removedPenas.forEach(pena => {{
-                    if (devedoresData[pena]) {{
+            if (data.removedPenas && Array.isArray(data.removedPenas)) {
+                data.removedPenas.forEach(pena => {
+                    if (devedoresData[pena]) {
                         removedPenas.add(pena);
                         // Marcar linhas na tabela
                         const rows = document.querySelectorAll('tr[data-pena="' + pena + '"]');
-                        rows.forEach(row => {{
+                        rows.forEach(row => {
                             row.classList.add('removed');
                             const btn = row.querySelector('.remove-btn');
-                            if (btn) {{
+                            if (btn) {
                                 btn.disabled = true;
                                 btn.style.opacity = '0.5';
-                            }}
-                        }});
-                    }}
-                }});
-            }}
+                            }
+                        });
+                    }
+                });
+            }
             
             // Restaurar penas removidas por mês
-            if (data.removedPenasPorMes && Array.isArray(data.removedPenasPorMes)) {{
-                data.removedPenasPorMes.forEach(uniqueId => {{
-                    if (devedoresPorMesData[uniqueId]) {{
+            if (data.removedPenasPorMes && Array.isArray(data.removedPenasPorMes)) {
+                data.removedPenasPorMes.forEach(uniqueId => {
+                    if (devedoresPorMesData[uniqueId]) {
                         removedPenasPorMes.add(uniqueId);
                         // Marcar linha na tabela
                         const row = document.querySelector('tr[data-unique-id="' + uniqueId + '"]');
-                        if (row) {{
+                        if (row) {
                             row.classList.add('removed');
                             const btn = row.querySelector('.remove-btn');
-                            if (btn) {{
+                            if (btn) {
                                 btn.disabled = true;
                                 btn.style.opacity = '0.5';
-                            }}
-                        }}
-                    }}
-                }});
-            }}
+                            }
+                        }
+                    }
+                });
+            }
             
             // Atualizar métricas após restaurar
             updateMetrics();
             updateRemovedList();
-        }}
+        }
         
         // Função para limpar remoções do localStorage
-        function clearRemovals() {{
-            try {{
+        function clearRemovals() {
+            try {
                 localStorage.removeItem(storageKey);
-            }} catch (e) {{
+            } catch (e) {
                 console.warn('Não foi possível limpar localStorage:', e);
-            }}
+            }
             
             // Remover também do HTML
             const scriptEl = document.getElementById('saved-removals-data');
-            if (scriptEl) {{
+            if (scriptEl) {
                 scriptEl.remove();
-            }}
-        }}
+            }
+        }
         
-        function formatCurrency(value) {{
-            return 'R$ ' + value.toFixed(2).replace('.', ',').replace(/\\B(?=(\\d{{3}})+(?!\\d))/g, '.');
-        }}
+        function formatCurrency(value) {
+            return 'R$ ' + value.toFixed(2).replace('.', ',').replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.');
+        }
         
-        function formatNumber(value) {{
+        function formatNumber(value) {
             return value.toLocaleString('pt-BR');
-        }}
+        }
         
         function updateMetrics() {{
             let totalDevedores = originalData.devedores;
