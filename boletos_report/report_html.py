@@ -419,12 +419,12 @@ def generate_html_report(
         <h3>Maior Boleto em Aberto</h3>
         <table>
             <tr><th>Campo</th><th>Valor</th></tr>
-            <tr><td>Valor</td><td>{format_currency(boleto_max['valor'])}</td></tr>
-            <tr><td>Nome</td><td>{boleto_max['nome']}</td></tr>
-            <tr><td>Pena de Água</td><td>{boleto_max['pena_agua']}</td></tr>
-            <tr><td>Vencimento</td><td>{boleto_max['vencimento'].strftime('%d/%m/%Y') if boleto_max['vencimento'] else 'N/A'}</td></tr>
-            <tr><td>Banco</td><td>{boleto_max['banco']}</td></tr>
-            <tr><td>Número Nosso</td><td>{boleto_max['numero_nosso']}</td></tr>
+            <tr><td>Valor</td><td class="dynamic" id="boleto-max-valor">{format_currency(boleto_max['valor'])}</td></tr>
+            <tr><td>Nome</td><td class="dynamic" id="boleto-max-nome">{boleto_max['nome']}</td></tr>
+            <tr><td>Pena de Água</td><td class="dynamic" id="boleto-max-pena">{boleto_max['pena_agua']}</td></tr>
+            <tr><td>Vencimento</td><td class="dynamic" id="boleto-max-vencimento">{boleto_max['vencimento'].strftime('%d/%m/%Y') if boleto_max['vencimento'] else 'N/A'}</td></tr>
+            <tr><td>Banco</td><td class="dynamic" id="boleto-max-banco">{boleto_max['banco']}</td></tr>
+            <tr><td>Número Nosso</td><td class="dynamic" id="boleto-max-numero">{boleto_max['numero_nosso']}</td></tr>
         </table>
 """)
     
@@ -434,12 +434,12 @@ def generate_html_report(
         <h3>Menor Boleto em Aberto</h3>
         <table>
             <tr><th>Campo</th><th>Valor</th></tr>
-            <tr><td>Valor</td><td>{format_currency(boleto_min['valor'])}</td></tr>
-            <tr><td>Nome</td><td>{boleto_min['nome']}</td></tr>
-            <tr><td>Pena de Água</td><td>{boleto_min['pena_agua']}</td></tr>
-            <tr><td>Vencimento</td><td>{boleto_min['vencimento'].strftime('%d/%m/%Y') if boleto_min['vencimento'] else 'N/A'}</td></tr>
-            <tr><td>Banco</td><td>{boleto_min['banco']}</td></tr>
-            <tr><td>Número Nosso</td><td>{boleto_min['numero_nosso']}</td></tr>
+            <tr><td>Valor</td><td class="dynamic" id="boleto-min-valor">{format_currency(boleto_min['valor'])}</td></tr>
+            <tr><td>Nome</td><td class="dynamic" id="boleto-min-nome">{boleto_min['nome']}</td></tr>
+            <tr><td>Pena de Água</td><td class="dynamic" id="boleto-min-pena">{boleto_min['pena_agua']}</td></tr>
+            <tr><td>Vencimento</td><td class="dynamic" id="boleto-min-vencimento">{boleto_min['vencimento'].strftime('%d/%m/%Y') if boleto_min['vencimento'] else 'N/A'}</td></tr>
+            <tr><td>Banco</td><td class="dynamic" id="boleto-min-banco">{boleto_min['banco']}</td></tr>
+            <tr><td>Número Nosso</td><td class="dynamic" id="boleto-min-numero">{boleto_min['numero_nosso']}</td></tr>
         </table>
 """)
     
@@ -836,6 +836,30 @@ def generate_html_report(
     html_content.append("""
         };
         
+        // Dados dos boletos individuais (para maior/menor boleto)
+        const boletosIndividuais = [
+""")
+    
+    # Adicionar dados de todos os boletos individuais
+    if len(df_open) > 0:
+        boletos_json = []
+        for _, row in df_open.iterrows():
+            vencimento_str = row['data_vencimento_dt'].strftime('%d/%m/%Y') if pd.notna(row['data_vencimento_dt']) else 'N/A'
+            boletos_json.append(f"""            {{
+                "valor": {row['valor_float']},
+                "nome": {repr(row['nome_pagador'])},
+                "pena_agua": {repr(str(row['pena_agua']))},
+                "vencimento": {repr(vencimento_str)},
+                "banco": {repr(row['banco'])},
+                "numero_nosso": {repr(str(row.get('numero_nosso', 'N/A')))},
+                "mes": {repr(str(row['mes_referencia']))},
+                "unique_id": {repr(f"{row['pena_agua']}_{row['mes_referencia']}")}
+            }}""")
+        html_content.append(',\n'.join(boletos_json))
+    
+    html_content.append("""
+        ];
+        
         const removedPenas = new Set(); // Pena completa (todos os meses)
         const removedPenasPorMes = new Set(); // Pena + mês específico
         
@@ -914,6 +938,127 @@ def generate_html_report(
             
             // Atualizar estatísticas descritivas
             updateDescriptiveStats();
+            
+            // Atualizar maior e menor boleto
+            updateMaxMinBoleto();
+        }
+        
+        function updateMaxMinBoleto() {
+            // Filtrar boletos ativos (não removidos)
+            const boletosAtivos = boletosIndividuais.filter(boleto => {
+                // Verificar se a pena completa foi removida
+                if (removedPenas.has(boleto.pena_agua)) {
+                    return false;
+                }
+                // Verificar se este mês específico foi removido
+                if (removedPenasPorMes.has(boleto.unique_id)) {
+                    return false;
+                }
+                return true;
+            });
+            
+            if (boletosAtivos.length === 0) {
+                // Se não há boletos ativos, limpar campos
+                const campos = ['valor', 'nome', 'pena', 'vencimento', 'banco', 'numero'];
+                campos.forEach(campo => {
+                    const elMax = document.getElementById(`boleto-max-${campo}`);
+                    const elMin = document.getElementById(`boleto-min-${campo}`);
+                    if (elMax) elMax.textContent = 'N/A';
+                    if (elMin) elMin.textContent = 'N/A';
+                });
+                return;
+            }
+            
+            // Encontrar maior e menor boleto
+            let maiorBoleto = boletosAtivos[0];
+            let menorBoleto = boletosAtivos[0];
+            
+            boletosAtivos.forEach(boleto => {
+                if (boleto.valor > maiorBoleto.valor) {
+                    maiorBoleto = boleto;
+                }
+                if (boleto.valor < menorBoleto.valor) {
+                    menorBoleto = boleto;
+                }
+            });
+            
+            // Atualizar maior boleto
+            const boletoMaxValor = document.getElementById('boleto-max-valor');
+            const boletoMaxNome = document.getElementById('boleto-max-nome');
+            const boletoMaxPena = document.getElementById('boleto-max-pena');
+            const boletoMaxVencimento = document.getElementById('boleto-max-vencimento');
+            const boletoMaxBanco = document.getElementById('boleto-max-banco');
+            const boletoMaxNumero = document.getElementById('boleto-max-numero');
+            
+            if (boletoMaxValor) {
+                boletoMaxValor.classList.add('updated');
+                boletoMaxValor.textContent = formatCurrency(maiorBoleto.valor);
+                setTimeout(() => boletoMaxValor.classList.remove('updated'), 500);
+            }
+            if (boletoMaxNome) {
+                boletoMaxNome.classList.add('updated');
+                boletoMaxNome.textContent = maiorBoleto.nome;
+                setTimeout(() => boletoMaxNome.classList.remove('updated'), 500);
+            }
+            if (boletoMaxPena) {
+                boletoMaxPena.classList.add('updated');
+                boletoMaxPena.textContent = maiorBoleto.pena_agua;
+                setTimeout(() => boletoMaxPena.classList.remove('updated'), 500);
+            }
+            if (boletoMaxVencimento) {
+                boletoMaxVencimento.classList.add('updated');
+                boletoMaxVencimento.textContent = maiorBoleto.vencimento;
+                setTimeout(() => boletoMaxVencimento.classList.remove('updated'), 500);
+            }
+            if (boletoMaxBanco) {
+                boletoMaxBanco.classList.add('updated');
+                boletoMaxBanco.textContent = maiorBoleto.banco;
+                setTimeout(() => boletoMaxBanco.classList.remove('updated'), 500);
+            }
+            if (boletoMaxNumero) {
+                boletoMaxNumero.classList.add('updated');
+                boletoMaxNumero.textContent = maiorBoleto.numero_nosso;
+                setTimeout(() => boletoMaxNumero.classList.remove('updated'), 500);
+            }
+            
+            // Atualizar menor boleto
+            const boletoMinValor = document.getElementById('boleto-min-valor');
+            const boletoMinNome = document.getElementById('boleto-min-nome');
+            const boletoMinPena = document.getElementById('boleto-min-pena');
+            const boletoMinVencimento = document.getElementById('boleto-min-vencimento');
+            const boletoMinBanco = document.getElementById('boleto-min-banco');
+            const boletoMinNumero = document.getElementById('boleto-min-numero');
+            
+            if (boletoMinValor) {
+                boletoMinValor.classList.add('updated');
+                boletoMinValor.textContent = formatCurrency(menorBoleto.valor);
+                setTimeout(() => boletoMinValor.classList.remove('updated'), 500);
+            }
+            if (boletoMinNome) {
+                boletoMinNome.classList.add('updated');
+                boletoMinNome.textContent = menorBoleto.nome;
+                setTimeout(() => boletoMinNome.classList.remove('updated'), 500);
+            }
+            if (boletoMinPena) {
+                boletoMinPena.classList.add('updated');
+                boletoMinPena.textContent = menorBoleto.pena_agua;
+                setTimeout(() => boletoMinPena.classList.remove('updated'), 500);
+            }
+            if (boletoMinVencimento) {
+                boletoMinVencimento.classList.add('updated');
+                boletoMinVencimento.textContent = menorBoleto.vencimento;
+                setTimeout(() => boletoMinVencimento.classList.remove('updated'), 500);
+            }
+            if (boletoMinBanco) {
+                boletoMinBanco.classList.add('updated');
+                boletoMinBanco.textContent = menorBoleto.banco;
+                setTimeout(() => boletoMinBanco.classList.remove('updated'), 500);
+            }
+            if (boletoMinNumero) {
+                boletoMinNumero.classList.add('updated');
+                boletoMinNumero.textContent = menorBoleto.numero_nosso;
+                setTimeout(() => boletoMinNumero.classList.remove('updated'), 500);
+            }
         }
         
         function updateDescriptiveStats() {
