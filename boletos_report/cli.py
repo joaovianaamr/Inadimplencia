@@ -7,6 +7,7 @@ import logging
 import sys
 from pathlib import Path
 from typing import List, Optional
+from datetime import datetime
 
 from boletos_report.io import load_all_csvs, validate_required_columns
 from boletos_report.cleaning import clean_dataframe
@@ -126,10 +127,16 @@ def main():
         logger.error(f"Caminho de entrada não encontrado: {args.input}")
         sys.exit(1)
     
-    # Criar diretório de saída
-    output_path = Path(args.output)
+    # Criar diretório de saída com timestamp único para cada execução
+    base_output = Path(args.output)
+    base_output.mkdir(parents=True, exist_ok=True)
+    
+    # Criar pasta única com timestamp para esta execução
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_path = base_output / f"relatorio_{timestamp}"
     output_path.mkdir(parents=True, exist_ok=True)
     logger.info(f"Diretório de saída: {output_path}")
+    logger.info(f"Relatório único criado: relatorio_{timestamp}")
     
     # Parse formatos
     formats = [f.strip().lower() for f in args.format.split(',')]
