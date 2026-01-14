@@ -9,7 +9,8 @@ from boletos_report.cleaning import (
     parse_valor,
     parse_data,
     extract_pena_agua_from_name,
-    derive_mes_referencia
+    derive_mes_referencia,
+    remove_duplicates_by_pena_month
 )
 
 
@@ -153,3 +154,71 @@ class TestDeriveMesReferencia:
         """Testa com None."""
         mes = derive_mes_referencia(None)
         assert mes is None
+
+
+class TestRemoveDuplicatesByPenaMonth:
+    """Testes para remoção de duplicatas de pena_agua no mesmo mês."""
+    
+    def test_remove_duplicates_same_month(self):
+        """Testa remoção de duplicatas no mesmo mês."""
+        df = pd.DataFrame({
+            'pena_agua': ['436', '436', '789', '123'],
+            'mes_referencia': ['2025-10', '2025-10', '2025-10', '2025-11'],
+            'valor_float': [100.0, 200.0, 300.0, 400.0],
+            'status_categoria': ['OPEN', 'PAID', 'OPEN', 'OPEN']
+        })
+        
+        result = remove_duplicates_by_pena_month(df)
+        
+        # Deve manter apenas uma ocorrência de pena 436 no mês 2025-10
+        # Prioriza OPEN e maior valor, então deve manter a primeira (OPEN, 100.0)
+        assert len(result) == 3
+        assert len(result[result['pena_agua'] == '436']) == 1
+        assert len(result[result['pena_agua'] == '789']) == 1
+        assert len(result[result['pena_agua'] == '123']) == 1
+    
+    def test_remove_duplicates_different_months(self):
+        """Testa que duplicatas em meses diferentes não são removidas."""
+        df = pd.DataFrame({
+            'pena_agua': ['436', '436', '436'],
+            'mes_referencia': ['2025-10', '2025-11', '2025-12'],
+            'valor_float': [100.0, 200.0, 300.0],
+            'status_categoria': ['OPEN', 'OPEN', 'OPEN']
+        })
+        
+        result = remove_duplicates_by_pena_month(df)
+        
+        # Deve manter todas as ocorrências pois são em meses diferentes
+        assert len(result) == 3
+        assert len(result[result['pena_agua'] == '436']) == 3
+    
+    def test_remove_duplicates_prioritize_open(self):
+        """Testa que status OPEN é priorizado."""
+        df = pd.DataFrame({
+            'pena_agua': ['436', '436'],
+            'mes_referencia': ['2025-10', '2025-10'],
+            'valor_float': [100.0, 200.0],
+            'status_categoria': ['PAID', 'OPEN']  # OPEN deve ser mantido
+        })
+        
+        result = remove_duplicates_by_pena_month(df)
+        
+        # Deve manter apenas uma ocorrência, priorizando OPEN
+        assert len(result) == 1
+        assert result.iloc[0]['status_categoria'] == 'OPEN'
+        assert result.iloc[0]['valor_float'] == 200.0
+    
+    def test_remove_duplicates_invalid_pena(self):
+        """Testa que linhas com pena_agua inválida não são processadas."""
+        df = pd.DataFrame({
+            'pena_agua': ['436', '436', '', None, 'nan'],
+            'mes_referencia': ['2025-10', '2025-10', '2025-10', '2025-10', '2025-10'],
+            'valor_float': [100.0, 200.0, 300.0, 400.0, 500.0],
+            'status_categoria': ['OPEN', 'OPEN', 'OPEN', 'OPEN', 'OPEN']
+        })
+        
+        result = remove_duplicates_by_pena_month(df)
+        
+        # Deve remover duplicata válida (436) mas manter inválidas
+        assert len(result) == 4  # 1 válida + 3 inválidas
+        assert len(result[result['pena_agua'] == '436']) == 1

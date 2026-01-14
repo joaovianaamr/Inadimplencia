@@ -167,6 +167,89 @@ def derive_mes_referencia(data_vencimento: datetime) -> Optional[str]:
     return None
 
 
+def remove_duplicates_by_pena_month(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Remove duplicatas de pena_agua no mesmo mês.
+    Se uma pena aparecer múltiplas vezes no mesmo mes_referencia,
+    mantém apenas a primeira ocorrência (priorizando status OPEN e maior valor).
+    
+    Args:
+        df: DataFrame com dados limpos
+        
+    Returns:
+        DataFrame sem duplicatas de pena_agua por mês
+    """
+    df = df.copy()
+    
+    # Filtrar apenas linhas com pena_agua e mes_referencia válidos
+    # (não vazios, não None, não 'nan', não 'None')
+    pena_str = df['pena_agua'].astype(str).str.strip()
+    mes_str = df['mes_referencia'].astype(str).str.strip()
+    
+    mask_valido = (
+        df['pena_agua'].notna() & 
+        (pena_str != '') &
+        (pena_str.lower() != 'nan') &
+        (pena_str.lower() != 'none') &
+        df['mes_referencia'].notna() &
+        (mes_str != '') &
+        (mes_str.lower() != 'nan') &
+        (mes_str.lower() != 'none')
+    )
+    
+    df_validos = df[mask_valido].copy()
+    df_invalidos = df[~mask_valido].copy()
+    
+    if len(df_validos) == 0:
+        logger.info("Nenhuma linha válida com pena_agua e mes_referencia para deduplicação")
+        return df
+    
+    # Contar duplicatas antes da remoção
+    duplicatas = df_validos.duplicated(subset=['pena_agua', 'mes_referencia'], keep=False)
+    qtd_duplicatas = duplicatas.sum()
+    
+    if qtd_duplicatas > 0:
+        logger.info(f"Encontradas {qtd_duplicatas} linhas com duplicatas de pena_agua no mesmo mês")
+        
+        # Ordenar para garantir consistência: priorizar OPEN, depois por valor decrescente
+        # Criar coluna temporária para ordenação
+        if 'status_categoria' in df_validos.columns:
+            df_validos['_priority'] = df_validos['status_categoria'].map({'OPEN': 1, 'PAID': 2, 'OTHER': 3}).fillna(4)
+            sort_cols = ['pena_agua', 'mes_referencia', '_priority', 'valor_float']
+            ascending = [True, True, True, False]
+        else:
+            df_validos['_priority'] = 4  # Sem status, menor prioridade
+            sort_cols = ['pena_agua', 'mes_referencia', 'valor_float']
+            ascending = [True, True, False]
+        
+        df_validos = df_validos.sort_values(sort_cols, ascending=ascending)
+        
+        # Contar quantas linhas serão mantidas após remoção
+        qtd_antes = len(df_validos)
+        
+        # Remover duplicatas mantendo a primeira (que agora é a priorizada)
+        df_validos = df_validos.drop_duplicates(subset=['pena_agua', 'mes_referencia'], keep='first')
+        
+        # Remover coluna temporária
+        df_validos = df_validos.drop(columns=['_priority'])
+        
+        qtd_depois = len(df_validos)
+        qtd_removidas = qtd_antes - qtd_depois
+        logger.info(f"Removidas {qtd_removidas} linhas duplicadas de pena_agua no mesmo mês")
+    else:
+        logger.info("Nenhuma duplicata de pena_agua no mesmo mês encontrada")
+    
+    # Reconcatenar linhas válidas (já deduplicadas) com inválidas
+    if len(df_invalidos) > 0:
+        df_final = pd.concat([df_validos, df_invalidos], ignore_index=True)
+    else:
+        df_final = df_validos
+    
+    logger.info(f"Total de linhas após remoção de duplicatas: {len(df_final)} (antes: {len(df)})")
+    
+    return df_final
+
+
 def clean_dataframe(df: pd.DataFrame, status_classifier) -> pd.DataFrame:
     """
     Limpa e normaliza um DataFrame de boletos.
@@ -250,5 +333,9 @@ def clean_dataframe(df: pd.DataFrame, status_classifier) -> pd.DataFrame:
         df['nome_pagador_norm'] = df['nome_pagador'].apply(
             lambda x: normalize_name(x, remove_accents_flag=True)
         )
+    
+    # Remover duplicatas de pena_agua no mesmo mês
+    logger.info("Removendo duplicatas de pena_agua no mesmo mês...")
+    df = remove_duplicates_by_pena_month(df)
     
     return df
