@@ -325,8 +325,12 @@ def generate_html_report(
                 <input type="text" id="penaInput" placeholder="Digite a pena de água (ex: 436)" />
                 <button onclick="removerPena()">Dar Baixa</button>
                 <button onclick="resetarBaixas()" style="background-color: #757575;">Resetar Todas</button>
+                <button onclick="salvarMudancas()" style="background-color: #4caf50; margin-left: 10px;" id="btnSalvar" title="Salvar mudanças no arquivo HTML (para portabilidade)">
+                    💾 Salvar Mudanças
+                </button>
             </div>
             <div id="removedPenas" style="margin-top: 10px;"></div>
+            <div id="saveStatus" style="margin-top: 10px; font-size: 14px; color: #4caf50; display: none;"></div>
         </div>
     """)
     
@@ -992,6 +996,41 @@ def generate_html_report(
             if (scriptEl) {
                 scriptEl.remove();
             }
+        }
+        
+        // Função para salvar mudanças manualmente (com feedback visual)
+        function salvarMudancas() {
+            const btnSalvar = document.getElementById('btnSalvar');
+            const saveStatus = document.getElementById('saveStatus');
+            
+            // Salvar no localStorage e HTML
+            saveRemovals();
+            saveRemovalsToHTML();
+            
+            // Feedback visual
+            if (btnSalvar) {
+                btnSalvar.style.backgroundColor = '#81c784';
+                btnSalvar.textContent = '✓ Salvo!';
+                setTimeout(() => {
+                    btnSalvar.style.backgroundColor = '#4caf50';
+                    btnSalvar.textContent = '💾 Salvar Mudanças';
+                }, 2000);
+            }
+            
+            if (saveStatus) {
+                const totalBaixas = removedPenas.size + removedPenasPorMes.size;
+                saveStatus.textContent = `✓ Mudanças salvas com sucesso! (${totalBaixas} baixa(s) salva(s))`;
+                saveStatus.style.display = 'block';
+                saveStatus.style.color = '#4caf50';
+                
+                setTimeout(() => {
+                    saveStatus.style.display = 'none';
+                }, 3000);
+            }
+            
+            // Tentar fazer download do HTML atualizado (opcional)
+            // Nota: Isso requer que o usuário salve manualmente o arquivo
+            console.log('Mudanças salvas. Para persistir no arquivo, salve o HTML manualmente (Ctrl+S ou Cmd+S)');
         }
         
         function formatCurrency(value) {
