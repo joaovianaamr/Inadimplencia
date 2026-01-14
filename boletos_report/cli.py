@@ -13,6 +13,7 @@ from boletos_report.cleaning import clean_dataframe
 from boletos_report.status_rules import StatusClassifier
 from boletos_report.metrics import (
     calculate_open_metrics,
+    calculate_open_metrics_by_bank,
     get_max_min_boleto_open,
     calculate_temporal_evolution,
     calculate_debt_change_month_over_month,
@@ -194,6 +195,7 @@ def main():
         logger.info("ETAPA 4: Calculando métricas de inadimplência...")
         logger.info("=" * 60)
         metrics = calculate_open_metrics(df_clean)
+        metrics_by_bank = calculate_open_metrics_by_bank(df_clean)
         max_min_boleto = get_max_min_boleto_open(df_clean)
         temporal_df = calculate_temporal_evolution(df_clean)
         debt_change = calculate_debt_change_month_over_month(df_clean)
@@ -234,6 +236,7 @@ def main():
             logger.info("=" * 60)
             generate_html_report(
                 metrics,
+                metrics_by_bank,
                 max_min_boleto,
                 temporal_df,
                 ranking_total,

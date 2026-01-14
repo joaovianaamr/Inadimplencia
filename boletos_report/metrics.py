@@ -104,6 +104,78 @@ def calculate_open_metrics(df: pd.DataFrame) -> Dict[str, Any]:
     }
 
 
+def calculate_open_metrics_by_bank(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calcula métricas de inadimplência por banco.
+    
+    Args:
+        df: DataFrame com dados limpos e classificados
+        
+    Returns:
+        DataFrame com métricas por banco
+    """
+    df_open = df[df['status_categoria'] == 'OPEN'].copy()
+    
+    if len(df_open) == 0:
+        return pd.DataFrame()
+    
+    # Agrupar por banco
+    metrics_by_bank = df_open.groupby('banco').agg({
+        'valor_float': ['sum', 'mean', 'median', 'std', 'count'],
+        'person_id': 'nunique'
+    }).reset_index()
+    
+    # Aplanar colunas
+    metrics_by_bank.columns = [
+        'banco',
+        'soma_divida',
+        'valor_medio',
+        'valor_mediana',
+        'valor_desvio_padrao',
+        'qtd_boletos',
+        'qtd_devedores_unicos'
+    ]
+    
+    # Calcular ticket médio
+    metrics_by_bank['ticket_medio'] = metrics_by_bank['soma_divida'] / metrics_by_bank['qtd_devedores_unicos']
+    metrics_by_bank['ticket_medio'] = metrics_by_bank['ticket_medio'].fillna(0.0)
+    
+    # Preencher NaN em outras colunas
+    metrics_by_bank['valor_medio'] = metrics_by_bank['valor_medio'].fillna(0.0)
+    metrics_by_bank['valor_mediana'] = metrics_by_bank['valor_mediana'].fillna(0.0)
+    metrics_by_bank['valor_desvio_padrao'] = metrics_by_bank['valor_desvio_padrao'].fillna(0.0)
+    
+    # Calcular percentis por banco
+    percentis_by_bank = []
+    for banco in metrics_by_bank['banco'].unique():
+        banco_data = df_open[df_open['banco'] == banco]
+        valores = banco_data[banco_data['valor_valido']]['valor_float']
+        if len(valores) > 0:
+            percentis_by_bank.append({
+                'banco': banco,
+                'valor_p90': valores.quantile(0.90),
+                'valor_p95': valores.quantile(0.95)
+            })
+        else:
+            percentis_by_bank.append({
+                'banco': banco,
+                'valor_p90': 0.0,
+                'valor_p95': 0.0
+            })
+    
+    percentis_df = pd.DataFrame(percentis_by_bank)
+    metrics_by_bank = metrics_by_bank.merge(percentis_df, on='banco', how='left')
+    
+    # Preencher NaN nos percentis
+    metrics_by_bank['valor_p90'] = metrics_by_bank['valor_p90'].fillna(0.0)
+    metrics_by_bank['valor_p95'] = metrics_by_bank['valor_p95'].fillna(0.0)
+    
+    # Ordenar por soma da dívida (maior primeiro)
+    metrics_by_bank = metrics_by_bank.sort_values('soma_divida', ascending=False)
+    
+    return metrics_by_bank
+
+
 def get_max_min_boleto_open(df: pd.DataFrame) -> Dict[str, Any]:
     """
     Encontra boleto OPEN com maior e menor valor.

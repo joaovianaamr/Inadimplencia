@@ -28,6 +28,7 @@ def format_percent(value: float) -> str:
 
 def generate_html_report(
     metrics: Dict[str, Any],
+    metrics_by_bank: pd.DataFrame,
     max_min_boleto: Dict[str, Any],
     temporal_df: pd.DataFrame,
     ranking_total: pd.DataFrame,
@@ -42,6 +43,7 @@ def generate_html_report(
     
     Args:
         metrics: Dicionário com métricas gerais
+        metrics_by_bank: DataFrame com métricas por banco
         max_min_boleto: Dicionário com maior e menor boleto
         temporal_df: DataFrame com evolução temporal
         ranking_total: Ranking por dívida total
@@ -292,6 +294,70 @@ def generate_html_report(
             <tr><td>Número Nosso</td><td>{boleto_min['numero_nosso']}</td></tr>
         </table>
 """)
+    
+    # 2.5. Análise por Banco
+    html_content.append("""
+        <h2>2.5. Análise de Inadimplência por Banco</h2>
+""")
+    
+    if len(metrics_by_bank) > 0:
+        html_content.append("""
+        <h3>Métricas por Banco</h3>
+        <table>
+            <tr>
+                <th>Banco</th>
+                <th>Soma da Dívida</th>
+                <th>Valor Médio</th>
+                <th>Valor Mediana</th>
+                <th>Desvio Padrão</th>
+                <th>P90</th>
+                <th>P95</th>
+                <th>Qtd Boletos</th>
+                <th>Qtd Devedores Únicos</th>
+                <th>Ticket Médio</th>
+            </tr>
+""")
+        for _, row in metrics_by_bank.iterrows():
+            html_content.append(f"""
+            <tr>
+                <td><strong>{row['banco']}</strong></td>
+                <td>{format_currency(row['soma_divida'])}</td>
+                <td>{format_currency(row['valor_medio'])}</td>
+                <td>{format_currency(row['valor_mediana'])}</td>
+                <td>{format_currency(row['valor_desvio_padrao'])}</td>
+                <td>{format_currency(row['valor_p90'])}</td>
+                <td>{format_currency(row['valor_p95'])}</td>
+                <td>{format_number(row['qtd_boletos'])}</td>
+                <td>{format_number(row['qtd_devedores_unicos'])}</td>
+                <td>{format_currency(row['ticket_medio'])}</td>
+            </tr>
+""")
+        html_content.append("</table>")
+        
+        # Gráfico de barras por banco (soma da dívida)
+        html_content.append("""
+        <h3>Comparação de Dívida Total por Banco</h3>
+        <p><em>Os valores estão ordenados do maior para o menor.</em></p>
+        <table>
+            <tr>
+                <th>Banco</th>
+                <th>Soma da Dívida</th>
+                <th>% do Total</th>
+            </tr>
+""")
+        total_geral = metrics_by_bank['soma_divida'].sum()
+        for _, row in metrics_by_bank.iterrows():
+            pct = (row['soma_divida'] / total_geral * 100) if total_geral > 0 else 0.0
+            html_content.append(f"""
+            <tr>
+                <td><strong>{row['banco']}</strong></td>
+                <td>{format_currency(row['soma_divida'])}</td>
+                <td>{format_percent(pct)}</td>
+            </tr>
+""")
+        html_content.append("</table>")
+    else:
+        html_content.append("<p>Nenhum dado disponível para análise por banco.</p>")
     
     # 3. Ranking de devedores
     html_content.append("""
