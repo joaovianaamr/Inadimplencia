@@ -325,7 +325,7 @@ def generate_html_report(
     # Maior e menor dívida individual
     html_content.append("""
         <h3>Maior e Menor Dívida Individual</h3>
-        <table>
+        <table id="maxMinDebtTable">
             <tr>
                 <th>Métrica</th>
                 <th>Pena de Água</th>
@@ -336,21 +336,21 @@ def generate_html_report(
     
     if metrics['maior_divida_person_id']:
         html_content.append(f"""
-            <tr>
+            <tr id="maior-divida-row">
                 <td><strong>Maior Dívida</strong></td>
-                <td>{metrics['maior_divida_pena_agua']}</td>
-                <td>{metrics['maior_divida_nome']}</td>
-                <td>{format_currency(metrics['maior_divida_individual'])}</td>
+                <td id="maior-divida-pena">{metrics['maior_divida_pena_agua']}</td>
+                <td id="maior-divida-nome">{metrics['maior_divida_nome']}</td>
+                <td id="maior-divida-valor">{format_currency(metrics['maior_divida_individual'])}</td>
             </tr>
 """)
     
     if metrics['menor_divida_person_id']:
         html_content.append(f"""
-            <tr>
+            <tr id="menor-divida-row">
                 <td><strong>Menor Dívida</strong></td>
-                <td>{metrics['menor_divida_pena_agua']}</td>
-                <td>{metrics['menor_divida_nome']}</td>
-                <td>{format_currency(metrics['menor_divida_individual'])}</td>
+                <td id="menor-divida-pena">{metrics['menor_divida_pena_agua']}</td>
+                <td id="menor-divida-nome">{metrics['menor_divida_nome']}</td>
+                <td id="menor-divida-valor">{format_currency(metrics['menor_divida_individual'])}</td>
             </tr>
 """)
     
@@ -754,6 +754,79 @@ def generate_html_report(
             kpiBoletos.textContent = formatNumber(totalBoletos);
             kpiDivida.textContent = formatCurrency(totalDivida);
             kpiTicket.textContent = formatCurrency(ticketMedio);
+            
+            // Atualizar maior e menor dívida
+            updateMaxMinDebt();
+        }
+        
+        function updateMaxMinDebt() {
+            // Filtrar devedores não removidos
+            const devedoresAtivos = Object.entries(devedoresData)
+                .filter(([pena, data]) => !removedPenas.has(pena))
+                .map(([pena, data]) => ({
+                    pena: pena,
+                    nome: data.nome,
+                    valor: data.valor
+                }));
+            
+            if (devedoresAtivos.length === 0) {
+                // Se não há devedores ativos, limpar a tabela
+                const maiorRow = document.getElementById('maior-divida-row');
+                const menorRow = document.getElementById('menor-divida-row');
+                if (maiorRow) maiorRow.style.display = 'none';
+                if (menorRow) menorRow.style.display = 'none';
+                return;
+            }
+            
+            // Ordenar por valor
+            devedoresAtivos.sort((a, b) => b.valor - a.valor);
+            
+            const maior = devedoresAtivos[0];
+            const menor = devedoresAtivos[devedoresAtivos.length - 1];
+            
+            // Atualizar maior dívida
+            const maiorPena = document.getElementById('maior-divida-pena');
+            const maiorNome = document.getElementById('maior-divida-nome');
+            const maiorValor = document.getElementById('maior-divida-valor');
+            const maiorRow = document.getElementById('maior-divida-row');
+            
+            if (maiorPena && maiorNome && maiorValor && maiorRow) {
+                maiorRow.style.display = '';
+                maiorPena.textContent = maior.pena;
+                maiorNome.textContent = maior.nome;
+                maiorValor.textContent = formatCurrency(maior.valor);
+                
+                // Adicionar animação
+                [maiorPena, maiorNome, maiorValor].forEach(el => {
+                    el.style.transition = 'all 0.3s ease';
+                    el.style.backgroundColor = '#fff3cd';
+                    setTimeout(() => {
+                        el.style.backgroundColor = '';
+                    }, 500);
+                });
+            }
+            
+            // Atualizar menor dívida
+            const menorPena = document.getElementById('menor-divida-pena');
+            const menorNome = document.getElementById('menor-divida-nome');
+            const menorValor = document.getElementById('menor-divida-valor');
+            const menorRow = document.getElementById('menor-divida-row');
+            
+            if (menorPena && menorNome && menorValor && menorRow) {
+                menorRow.style.display = '';
+                menorPena.textContent = menor.pena;
+                menorNome.textContent = menor.nome;
+                menorValor.textContent = formatCurrency(menor.valor);
+                
+                // Adicionar animação
+                [menorPena, menorNome, menorValor].forEach(el => {
+                    el.style.transition = 'all 0.3s ease';
+                    el.style.backgroundColor = '#fff3cd';
+                    setTimeout(() => {
+                        el.style.backgroundColor = '';
+                    }, 500);
+                });
+            }
         }
         
         function removerPena(pena) {
@@ -846,7 +919,7 @@ def generate_html_report(
             });
             
             removedPenas.clear();
-            updateMetrics();
+            updateMetrics(); // Isso já chama updateMaxMinDebt()
             updateRemovedList();
         }
         
