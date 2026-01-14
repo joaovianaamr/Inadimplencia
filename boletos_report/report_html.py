@@ -669,7 +669,7 @@ def generate_html_report(
             html_content.append(f"""
             <tr class="debtor-row" data-pena="{row['pena_agua']}">
                 <td>
-                    <button class="remove-btn" onclick="removerPenaPorBotao('{row['pena_agua']}')" title="Dar baixa desta pena">−</button>
+                    <button class="remove-btn" onclick="removerPenaPorBotao('{row['pena_agua']}', event)" title="Dar baixa desta pena">−</button>
                 </td>
                 <td><strong>{row['pena_agua']}</strong></td>
                 <td>{row['nome']}</td>
@@ -804,8 +804,23 @@ def generate_html_report(
             }
         }
         
-        function removerPenaPorBotao(pena) {
+        function removerPenaPorBotao(pena, event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            
+            // Salvar posição atual do scroll
+            const scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+            
             removerPena(pena);
+            
+            // Restaurar posição do scroll após um pequeno delay para garantir que o DOM foi atualizado
+            setTimeout(() => {
+                window.scrollTo(0, scrollPosition);
+            }, 10);
+            
+            return false;
         }
         
         function resetarBaixas() {
