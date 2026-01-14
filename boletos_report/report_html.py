@@ -713,18 +713,33 @@ def generate_html_report(
     devedores_por_mes = pd.DataFrame()
     
     if len(df_open) > 0:
+        # Primeiro, calcular total de boletos por pena_agua (para exibição informativa)
+        qtd_boletos_por_pena = df_open.groupby(['pena_agua', 'nome_pagador', 'banco']).size().reset_index(name='qtd_boletos_total')
+        
         # Agrupar por pena, nome, banco E mês para ter uma linha por mês
+        # Manter count para saber quantos boletos há naquele mês específico (para remoção)
         devedores_por_mes = df_open.groupby(['pena_agua', 'nome_pagador', 'banco', 'mes_referencia']).agg({
             'valor_float': ['sum', 'count']
         }).reset_index()
-        devedores_por_mes.columns = ['pena_agua', 'nome', 'banco', 'mes', 'valor_total', 'qtd_boletos']
+        devedores_por_mes.columns = ['pena_agua', 'nome', 'banco', 'mes', 'valor_total', 'qtd_boletos_mes']
+        
+        # Adicionar quantidade total de boletos por pena (não por mês) - para exibição
+        # Renomear 'nome' temporariamente para fazer o merge
+        devedores_por_mes_temp = devedores_por_mes.rename(columns={'nome': 'nome_pagador'})
+        devedores_por_mes_temp = devedores_por_mes_temp.merge(
+            qtd_boletos_por_pena[['pena_agua', 'nome_pagador', 'banco', 'qtd_boletos_total']],
+            on=['pena_agua', 'nome_pagador', 'banco'],
+            how='left'
+        )
+        devedores_por_mes = devedores_por_mes_temp.rename(columns={'nome_pagador': 'nome'})
         devedores_por_mes = devedores_por_mes.sort_values('valor_total', ascending=False)
         
         for _, row in devedores_por_mes.iterrows():
             # Criar ID único para esta combinação pena + mês
             unique_id = f"{row['pena_agua']}_{row['mes']}"
+            qtd_boletos_total = int(row.get('qtd_boletos_total', 0))
             html_content.append(f"""
-            <tr class="debtor-row" data-pena="{row['pena_agua']}" data-mes="{row['mes']}" data-unique-id="{unique_id}" data-valor="{row['valor_total']}" data-qtd="{int(row['qtd_boletos'])}">
+            <tr class="debtor-row" data-pena="{row['pena_agua']}" data-mes="{row['mes']}" data-unique-id="{unique_id}" data-valor="{row['valor_total']}" data-qtd="{qtd_boletos_total}">
                 <td>
                     <button class="remove-btn" onclick="removerPenaPorMes('{row['pena_agua']}', '{row['mes']}', event)" title="Dar baixa apenas deste mês">−</button>
                 </td>
@@ -732,7 +747,7 @@ def generate_html_report(
                 <td data-value="{repr(row['nome'])}">{row['nome']}</td>
                 <td data-value="{repr(row['banco'])}">{row['banco']}</td>
                 <td data-value="{row['valor_total']}">{format_currency(row['valor_total'])}</td>
-                <td data-value="{int(row['qtd_boletos'])}">{int(row['qtd_boletos'])}</td>
+                <td data-value="{qtd_boletos_total}">{qtd_boletos_total}</td>
                 <td data-value="{repr(str(row['mes']))}">{row['mes']}</td>
             </tr>
 """)
@@ -805,13 +820,16 @@ def generate_html_report(
         devedores_mes_json = []
         for _, row in devedores_por_mes.iterrows():
             unique_id = f"{row['pena_agua']}_{row['mes']}"
+            qtd_boletos_total = int(row.get('qtd_boletos_total', 0))
+            qtd_boletos_mes = int(row.get('qtd_boletos_mes', 0))  # Quantidade do mês específico (para remoção)
             devedores_mes_json.append(f"""            "{unique_id}": {{
                 "pena": {repr(str(row['pena_agua']))},
                 "nome": {repr(row['nome'])},
                 "banco": {repr(row['banco'])},
                 "mes": {repr(str(row['mes']))},
                 "valor": {row['valor_total']},
-                "qtd_boletos": {int(row['qtd_boletos'])}
+                "qtd_boletos": {qtd_boletos_mes},
+                "qtd_boletos_total": {qtd_boletos_total}
             }}""")
         html_content.append(',\n'.join(devedores_mes_json))
     
