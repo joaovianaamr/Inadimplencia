@@ -867,7 +867,9 @@ def generate_html_report(
                     const data = devedoresPorMesData[uniqueId];
                     // Só remove se a pena completa não foi removida
                     if (!removedPenas.has(data.pena)) {
-                        totalBoletos -= data.qtd_boletos;
+                        // Usar qtd_boletos que é a quantidade do mês específico
+                        const qtdBoletosMes = data.qtd_boletos || 0;
+                        totalBoletos -= qtdBoletosMes;
                         totalDivida -= data.valor;
                         // Verificar se ainda há outros meses para esta pena
                         let temOutrosMeses = false;
@@ -893,15 +895,19 @@ def generate_html_report(
             const kpiDivida = document.getElementById('kpi-divida');
             const kpiTicket = document.getElementById('kpi-ticket');
             
-            [kpiDevedores, kpiBoletos, kpiDivida, kpiTicket].forEach(el => {
-                el.classList.add('updated');
-                setTimeout(() => el.classList.remove('updated'), 500);
-            });
-            
-            kpiDevedores.textContent = formatNumber(totalDevedores);
-            kpiBoletos.textContent = formatNumber(totalBoletos);
-            kpiDivida.textContent = formatCurrency(totalDivida);
-            kpiTicket.textContent = formatCurrency(ticketMedio);
+            if (kpiDevedores && kpiBoletos && kpiDivida && kpiTicket) {
+                [kpiDevedores, kpiBoletos, kpiDivida, kpiTicket].forEach(el => {
+                    if (el) {
+                        el.classList.add('updated');
+                        setTimeout(() => el.classList.remove('updated'), 500);
+                    }
+                });
+                
+                kpiDevedores.textContent = formatNumber(totalDevedores);
+                kpiBoletos.textContent = formatNumber(totalBoletos);
+                kpiDivida.textContent = formatCurrency(totalDivida);
+                kpiTicket.textContent = formatCurrency(ticketMedio);
+            }
             
             // Atualizar maior e menor dívida
             updateMaxMinDebt();
