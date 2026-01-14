@@ -1021,17 +1021,47 @@ def generate_html_report(
             }
         }
         
+        // Função para fazer download do HTML atualizado
+        function downloadUpdatedHTML() {
+            // Atualizar o script inline no DOM antes de fazer download
+            saveRemovalsToHTML();
+            
+            // Obter o HTML completo da página
+            const htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+            
+            // Criar blob e fazer download
+            const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            // Nome do arquivo baseado no número do relatório
+            const fileName = 'relatorio_inadimplencia_' + report_number + '.html';
+            a.download = fileName;
+            
+            // Adicionar ao DOM, clicar e remover
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            // Liberar URL
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+        }
+        
         // Função para salvar mudanças manualmente (com feedback visual)
         function salvarMudancas() {
             const btnSalvar = document.getElementById('btnSalvar');
             const saveStatus = document.getElementById('saveStatus');
             const toastNotification = document.getElementById('toastNotification');
             
-            // Salvar no localStorage e HTML
+            // Salvar no localStorage e HTML (DOM)
             saveRemovals();
             saveRemovalsToHTML();
             
             const totalBaixas = removedPenas.size + removedPenasPorMes.size;
+            
+            // Fazer download automático do HTML atualizado
+            downloadUpdatedHTML();
             
             // Feedback visual no botão
             if (btnSalvar) {
@@ -1045,7 +1075,7 @@ def generate_html_report(
             
             // Mensagem de status abaixo dos botões
             if (saveStatus) {
-                saveStatus.textContent = `✓ Mudanças salvas com sucesso! (${totalBaixas} baixa(s) salva(s))`;
+                saveStatus.textContent = `✓ Mudanças salvas com sucesso! (${totalBaixas} baixa(s) salva(s))\nArquivo HTML atualizado foi baixado. Substitua o arquivo original pelo arquivo baixado para persistir em qualquer navegador.`;
                 saveStatus.style.display = 'block';
                 saveStatus.style.color = '#4caf50';
                 saveStatus.style.fontWeight = 'bold';
@@ -1053,15 +1083,16 @@ def generate_html_report(
                 saveStatus.style.backgroundColor = '#e8f5e9';
                 saveStatus.style.borderRadius = '4px';
                 saveStatus.style.border = '2px solid #4caf50';
+                saveStatus.style.whiteSpace = 'pre-line';
                 
                 setTimeout(() => {
                     saveStatus.style.display = 'none';
-                }, 4000);
+                }, 6000);
             }
             
             // Toast notification (aviso destacado no canto superior direito)
             if (toastNotification) {
-                toastNotification.textContent = `✓ Mudanças salvas com sucesso! (${totalBaixas} baixa(s) salva(s))`;
+                toastNotification.textContent = `✓ Mudanças salvas! Arquivo baixado. (${totalBaixas} baixa(s))`;
                 toastNotification.style.display = 'block';
                 toastNotification.style.animation = 'slideIn 0.3s ease-out';
                 
@@ -1070,11 +1101,11 @@ def generate_html_report(
                     setTimeout(() => {
                         toastNotification.style.display = 'none';
                     }, 300);
-                }, 3500);
+                }, 4000);
             }
             
-            // Alerta do navegador (opcional, mais visível)
-            alert(`✓ Mudanças salvas com sucesso!\n\n${totalBaixas} baixa(s) foram salvas.\n\nAs mudanças foram salvas no navegador e no arquivo HTML.`);
+            // Alerta do navegador (mais visível)
+            alert(`✓ Mudanças salvas com sucesso!\n\n${totalBaixas} baixa(s) foram salvas.\n\nO arquivo HTML atualizado foi baixado automaticamente.\n\nIMPORTANTE: Substitua o arquivo original pelo arquivo baixado para que as mudanças persistam em qualquer navegador.`);
         }
         
         function formatCurrency(value) {
